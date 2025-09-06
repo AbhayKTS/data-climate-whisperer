@@ -16,8 +16,8 @@ serve(async (req) => {
     
     console.log(`Fetching climate data for lat: ${latitude}, lng: ${longitude}`);
 
-    // Current weather data from Open-Meteo
-    const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m&timezone=auto`;
+    // Current weather data from Open-Meteo with comprehensive parameters
+    const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,surface_pressure,weather_code&timezone=auto`;
     
     // Historical climate data (last 30 years using archive API)
     const historicalUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=1993-01-01&end_date=2022-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
@@ -48,6 +48,13 @@ serve(async (req) => {
 
     const currentData = await currentResponse.json();
     console.log('Current weather data received:', Object.keys(currentData));
+    console.log('Raw current weather values:', {
+      temperature: currentData.current.temperature_2m,
+      windSpeed: currentData.current.wind_speed_10m,
+      windDirection: currentData.current.wind_direction_10m,
+      precipitation: currentData.current.precipitation,
+      timestamp: currentData.current.time
+    });
 
     let historicalData = null;
     let tempAnomaly = 0;
@@ -80,10 +87,27 @@ serve(async (req) => {
       }
     }
 
+    // Validate and process current weather data
+    const currentTemp = currentData.current.temperature_2m;
+    const currentWindSpeed = currentData.current.wind_speed_10m;
+    const currentWindDirection = currentData.current.wind_direction_10m;
+    
+    // Data validation
+    if (currentTemp === null || currentTemp === undefined) {
+      console.warn('Invalid temperature data received');
+    }
+    if (currentWindSpeed === null || currentWindSpeed === undefined) {
+      console.warn('Invalid wind speed data received');
+    }
+    if (currentWindDirection === null || currentWindDirection === undefined) {
+      console.warn('Invalid wind direction data received');
+    }
+
     const result = {
       location: { latitude, longitude },
       temperature: {
-        current: currentData.current.temperature_2m,
+        current: currentTemp || 0,
+        apparent: currentData.current.apparent_temperature || currentTemp || 0,
         unit: currentData.current_units?.temperature_2m || '°C',
         anomaly: Number(tempAnomaly.toFixed(1)),
         trend: tempAnomaly > 0 ? 'warming' : tempAnomaly < 0 ? 'cooling' : 'stable'
@@ -94,16 +118,30 @@ serve(async (req) => {
         historical_average: Number(historicalPrecipAvg.toFixed(2))
       },
       wind: {
-        speed: currentData.current.wind_speed_10m || 0,
+        speed: currentWindSpeed || 0,
+        direction: currentWindDirection || 0,
+        gusts: currentData.current.wind_gusts_10m || 0,
         unit: currentData.current_units?.wind_speed_10m || 'km/h'
       },
       humidity: {
         current: currentData.current.relative_humidity_2m || 0,
         unit: currentData.current_units?.relative_humidity_2m || '%'
       },
-      timestamp: new Date().toISOString(),
+      pressure: {
+        current: currentData.current.surface_pressure || 0,
+        unit: currentData.current_units?.surface_pressure || 'hPa'
+      },
+      weather_code: currentData.current.weather_code || 0,
+      timestamp: currentData.current.time || new Date().toISOString(),
       hasHistoricalData: historicalData !== null
     };
+    
+    console.log('Final processed result:', {
+      temp: result.temperature.current,
+      windSpeed: result.wind.speed,
+      windDirection: result.wind.direction,
+      timestamp: result.timestamp
+    });
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
