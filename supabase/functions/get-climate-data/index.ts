@@ -16,8 +16,8 @@ serve(async (req) => {
     
     console.log(`Fetching climate data for lat: ${latitude}, lng: ${longitude}`);
 
-    // Use OpenWeatherMap API for more accurate real-time data
-    const currentWeatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=your_api_key&units=metric`;
+    // Current weather data from Open-Meteo forecast API (real-time data)
+    const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,surface_pressure,weather_code&timezone=auto`;
     
     // Historical climate data (last 30 years using archive API)
     const historicalUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=1993-01-01&end_date=2022-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
