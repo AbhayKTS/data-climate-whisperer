@@ -1,28 +1,36 @@
-// Working climate data layers using free services
+import { getLatestRadarTimestamp, generateTemperatureTile, generateWindTile } from '../services/weatherServices';
+
+// Working climate data layers using live services
 export const WORKING_CLIMATE_LAYERS = {
   temperature: {
-    // MeteoBlue public temperature tiles (no API key required for basic usage)
-    url: 'https://my.meteoblue.com/visimage/meteogram_web/{z}/{x}/{y}?apikey=',
-    attribution: '&copy; <a href="https://www.meteoblue.com/">MeteoBlue</a>',
+    // Custom temperature visualization using live data
+    url: '', // Will be generated dynamically
+    attribution: 'Live Temperature Data from Open-Meteo',
     opacity: 0.6,
-    fallback: true,
-    isLive: false
+    fallback: false,
+    isLive: true,
+    isDynamic: true
   },
   precipitation: {
-    // RainViewer precipitation radar (working free service)
-    url: 'https://tilecache.rainviewer.com/v2/radar/0/{z}/{x}/{y}/2/1_1.png',
+    // RainViewer precipitation radar with live timestamps
+    url: async () => {
+      const timestamp = await getLatestRadarTimestamp();
+      return `https://tilecache.rainviewer.com/v2/radar/${timestamp}/{z}/{x}/{y}/2/1_1.png`;
+    },
     attribution: '&copy; <a href="https://www.rainviewer.com/">RainViewer</a>',
     opacity: 0.6,
     fallback: false,
-    isLive: true
+    isLive: true,
+    isDynamic: true
   },
   wind: {
-    // Use OpenWeatherMap free wind layer (limited but functional)
-    url: 'https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=',
-    attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+    // Custom wind pattern visualization using live data
+    url: '', // Will be generated dynamically
+    attribution: 'Live Wind Data from Open-Meteo',
     opacity: 0.5,
-    fallback: true,
-    isLive: false
+    fallback: false,
+    isLive: true,
+    isDynamic: true
   }
 };
 
@@ -58,7 +66,37 @@ export const createTemperatureOverlay = (temperature: number, lat: number, lng: 
   return `data:image/svg+xml;base64,${btoa(svgContent)}`;
 };
 
-// Fallback colored overlays for demo purposes
+// Live weather layer generators using real climate data
+export const LIVE_CLIMATE_LAYERS = {
+  temperature: {
+    createTileFunction: (temperature: number, lat: number, lng: number) => {
+      return (x: number, y: number, z: number) => {
+        return generateTemperatureTile(temperature, lat, lng, x, y, z);
+      };
+    },
+    attribution: 'Live Temperature Data from Open-Meteo API',
+    opacity: 0.6
+  },
+  precipitation: {
+    createUrl: async () => {
+      const timestamp = await getLatestRadarTimestamp();
+      return `https://tilecache.rainviewer.com/v2/radar/${timestamp}/{z}/{x}/{y}/2/1_1.png`;
+    },
+    attribution: 'Live Precipitation Radar from RainViewer',
+    opacity: 0.6
+  },
+  wind: {
+    createTileFunction: (windSpeed: number, windDirection: number, lat: number, lng: number) => {
+      return (x: number, y: number, z: number) => {
+        return generateWindTile(windSpeed, windDirection, x, y, z);
+      };
+    },
+    attribution: 'Live Wind Data from Open-Meteo API',
+    opacity: 0.5
+  }
+};
+
+// Fallback layers for when live data is unavailable
 export const FALLBACK_LAYERS = {
   temperature: {
     createLayer: (temperature?: number, lat?: number, lng?: number) => {

@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import MapErrorBoundary from './MapErrorBoundary';
-import { WORKING_CLIMATE_LAYERS, FALLBACK_LAYERS, createTemperatureOverlay } from './WorkingClimateLayers';
+import { WORKING_CLIMATE_LAYERS, FALLBACK_LAYERS, LIVE_CLIMATE_LAYERS, createTemperatureOverlay } from './WorkingClimateLayers';
+import { getLatestRadarTimestamp } from '../services/weatherServices';
 
 // Fix for default markers in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -19,6 +20,8 @@ interface ClimateMapProps {
     currentWeather?: {
       temperature: number;
       windSpeed: number;
+      precipitation: number;
+      windDirection?: number;
     };
   };
 }
@@ -110,36 +113,86 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
     };
   }, []);
 
-  // Create layer helper function
-  const createLayer = useCallback((layerType: 'temperature' | 'precipitation' | 'wind') => {
-    const config = WORKING_CLIMATE_LAYERS[layerType];
-    let layer: L.TileLayer;
-
+  // Create layer helper function with live data support
+  const createLayer = useCallback(async (layerType: 'temperature' | 'precipitation' | 'wind') => {
     try {
-      // For temperature, use live data if available
-      if (layerType === 'temperature' && climateData?.currentWeather?.temperature !== undefined && selectedLocation) {
-        const liveLayer = FALLBACK_LAYERS.temperature.createLayer(
-          climateData.currentWeather.temperature,
+      const currentWeather = climateData?.currentWeather;
+      
+      // Temperature layer with live data
+      if (layerType === 'temperature' && currentWeather?.temperature !== undefined && selectedLocation) {
+        const tileFunction = LIVE_CLIMATE_LAYERS.temperature.createTileFunction(
+          currentWeather.temperature,
           selectedLocation.lat,
           selectedLocation.lng
         );
-        return L.tileLayer(liveLayer.url, {
-          attribution: liveLayer.attribution,
-          opacity: liveLayer.opacity,
+        
+        // Create custom tile layer that generates tiles dynamically
+        const CustomTileLayer = L.TileLayer.extend({
+          createTile: function(coords: any, done: any) {
+            const tile = document.createElement('img');
+            const tileUrl = tileFunction(coords.x, coords.y, coords.z);
+            if (tileUrl) {
+              tile.src = tileUrl;
+              tile.onload = () => done(null, tile);
+              tile.onerror = () => done(new Error('Tile load error'), null);
+            } else {
+              done(new Error('No tile URL'), null);
+            }
+            return tile;
+          }
+        });
+        
+        return new (CustomTileLayer as any)('', {
+          attribution: LIVE_CLIMATE_LAYERS.temperature.attribution,
+          opacity: LIVE_CLIMATE_LAYERS.temperature.opacity,
           maxZoom: 18
         });
       }
 
-      // For precipitation, use RainViewer (known working)
+      // Precipitation layer with live radar data
       if (layerType === 'precipitation') {
-        return L.tileLayer(config.url, {
-          attribution: config.attribution,
-          opacity: config.opacity,
+        const liveUrl = await LIVE_CLIMATE_LAYERS.precipitation.createUrl();
+        return L.tileLayer(liveUrl, {
+          attribution: LIVE_CLIMATE_LAYERS.precipitation.attribution,
+          opacity: LIVE_CLIMATE_LAYERS.precipitation.opacity,
           maxZoom: 18
         });
       }
 
-      // For other layers, create fallback immediately since API services don't work
+      // Wind layer with live data
+      if (layerType === 'wind' && currentWeather?.windSpeed !== undefined && selectedLocation) {
+        const windDirection = currentWeather.windDirection || 0;
+        const tileFunction = LIVE_CLIMATE_LAYERS.wind.createTileFunction(
+          currentWeather.windSpeed,
+          windDirection,
+          selectedLocation.lat,
+          selectedLocation.lng
+        );
+        
+        // Create custom tile layer for wind patterns
+        const CustomWindLayer = L.TileLayer.extend({
+          createTile: function(coords: any, done: any) {
+            const tile = document.createElement('img');
+            const tileUrl = tileFunction(coords.x, coords.y, coords.z);
+            if (tileUrl) {
+              tile.src = tileUrl;
+              tile.onload = () => done(null, tile);
+              tile.onerror = () => done(new Error('Tile load error'), null);
+            } else {
+              done(new Error('No tile URL'), null);
+            }
+            return tile;
+          }
+        });
+        
+        return new (CustomWindLayer as any)('', {
+          attribution: LIVE_CLIMATE_LAYERS.wind.attribution,
+          opacity: LIVE_CLIMATE_LAYERS.wind.opacity,
+          maxZoom: 18
+        });
+      }
+
+      // Fallback to static layers when no live data available
       if (FALLBACK_LAYERS[layerType]) {
         const fallbackConfig = FALLBACK_LAYERS[layerType].createLayer();
         return L.tileLayer(fallbackConfig.url, {
@@ -152,7 +205,8 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
       return null;
     } catch (error) {
       console.error(`Error creating ${layerType} layer:`, error);
-      // Return fallback layer if available
+      
+      // Return fallback layer on error
       if (FALLBACK_LAYERS[layerType]) {
         const fallbackConfig = FALLBACK_LAYERS[layerType].createLayer();
         return L.tileLayer(fallbackConfig.url, {
@@ -163,22 +217,26 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
       }
       return null;
     }
-  }, [map, climateData, selectedLocation]);
+  }, [climateData, selectedLocation]);
 
   // Handle layer changes with improved reliability
   useEffect(() => {
     if (!map || !isMapLoaded) return;
 
-    const updateLayers = () => {
+    const updateLayers = async () => {
       // Handle temperature layer
       if (selectedLayers.temperature !== !!climateLayers.temperature) {
         if (selectedLayers.temperature) {
           setLayerLoadingState(prev => ({ ...prev, temperature: true }));
-          const tempLayer = createLayer('temperature');
-          if (tempLayer) {
-            tempLayer.addTo(map);
-            setClimateLayers(prev => ({ ...prev, temperature: tempLayer }));
-            console.log('Temperature layer added');
+          try {
+            const tempLayer = await createLayer('temperature');
+            if (tempLayer) {
+              tempLayer.addTo(map);
+              setClimateLayers(prev => ({ ...prev, temperature: tempLayer }));
+              console.log('Live temperature layer added');
+            }
+          } catch (error) {
+            console.error('Error adding temperature layer:', error);
           }
           setLayerLoadingState(prev => ({ ...prev, temperature: false }));
         } else if (climateLayers.temperature) {
@@ -192,11 +250,15 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
       if (selectedLayers.precipitation !== !!climateLayers.precipitation) {
         if (selectedLayers.precipitation) {
           setLayerLoadingState(prev => ({ ...prev, precipitation: true }));
-          const precipLayer = createLayer('precipitation');
-          if (precipLayer) {
-            precipLayer.addTo(map);
-            setClimateLayers(prev => ({ ...prev, precipitation: precipLayer }));
-            console.log('Precipitation layer added');
+          try {
+            const precipLayer = await createLayer('precipitation');
+            if (precipLayer) {
+              precipLayer.addTo(map);
+              setClimateLayers(prev => ({ ...prev, precipitation: precipLayer }));
+              console.log('Live precipitation radar layer added');
+            }
+          } catch (error) {
+            console.error('Error adding precipitation layer:', error);
           }
           setLayerLoadingState(prev => ({ ...prev, precipitation: false }));
         } else if (climateLayers.precipitation) {
@@ -210,11 +272,15 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
       if (selectedLayers.wind !== !!climateLayers.wind) {
         if (selectedLayers.wind) {
           setLayerLoadingState(prev => ({ ...prev, wind: true }));
-          const windLayer = createLayer('wind');
-          if (windLayer) {
-            windLayer.addTo(map);
-            setClimateLayers(prev => ({ ...prev, wind: windLayer }));
-            console.log('Wind layer added');
+          try {
+            const windLayer = await createLayer('wind');
+            if (windLayer) {
+              windLayer.addTo(map);
+              setClimateLayers(prev => ({ ...prev, wind: windLayer }));
+              console.log('Live wind pattern layer added');
+            }
+          } catch (error) {
+            console.error('Error adding wind layer:', error);
           }
           setLayerLoadingState(prev => ({ ...prev, wind: false }));
         } else if (climateLayers.wind) {
@@ -225,7 +291,7 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
       }
     };
 
-    updateLayers();
+    updateLayers().catch(error => console.error('Error updating layers:', error));
   }, [map, selectedLayers, isMapLoaded, createLayer]);
 
   // Handle selected location marker
@@ -300,11 +366,11 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
               <span className="flex items-center gap-1">
                 Temperature
                 {climateData?.currentWeather?.temperature !== undefined && selectedLocation ? (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800">
-                    Live
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                    Live {climateData.currentWeather.temperature.toFixed(1)}°C
                   </span>
                 ) : (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
                     Demo
                   </span>
                 )}
@@ -322,8 +388,8 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
               />
               <span className="flex items-center gap-1">
                 Precipitation
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800">
-                  Live
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                  Live Radar
                 </span>
                 {layerLoadingState.precipitation && (
                   <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
@@ -339,9 +405,15 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
               />
               <span className="flex items-center gap-1">
                 Wind Patterns
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
-                  Demo
-                </span>
+                {climateData?.currentWeather?.windSpeed !== undefined && selectedLocation ? (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200">
+                    Live {climateData.currentWeather.windSpeed.toFixed(1)}m/s
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                    Demo
+                  </span>
+                )}
                 {layerLoadingState.wind && (
                   <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
                 )}
