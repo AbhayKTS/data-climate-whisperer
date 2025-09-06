@@ -1,155 +1,182 @@
-import React, { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, LayersControl } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix for default markers in React-Leaflet
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
 
 interface ClimateMapProps {
   onLocationSelect?: (coordinates: { lat: number; lng: number }, address?: string) => void;
   selectedLocation?: { lat: number; lng: number } | null;
 }
 
-const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocation }) => {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const marker = useRef<mapboxgl.Marker | null>(null);
-  const [isMapLoaded, setIsMapLoaded] = useState(false);
+// Custom climate marker icon
+const createClimateIcon = () => {
+  return L.divIcon({
+    className: 'custom-climate-marker',
+    html: `
+      <div style="
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+        border: 3px solid rgba(255, 255, 255, 0.8);
+        border-radius: 50%;
+        box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+        animation: pulse 2s infinite;
+      "></div>
+    `,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+};
 
-  useEffect(() => {
-    if (!mapContainer.current) return;
-
-    // Initialize map with Mapbox
-    mapboxgl.accessToken = 'pk.eyJ1IjoiY2xpbWF0ZS1leHBsb3JlciIsImEiOiJjbHNoOXgzY3cwMjNuMnBwNzFkZGdvdWl4In0.temporary'; // This will be replaced with user's token
-    
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/satellite-v9',
-      projection: 'globe' as any,
-      zoom: 1.5,
-      center: [20, 30],
-      pitch: 0,
-    });
-
-    // Add navigation controls
-    map.current.addControl(
-      new mapboxgl.NavigationControl({
-        visualizePitch: true,
-      }),
-      'top-right'
-    );
-
-    // Disable scroll zoom for smoother experience
-    map.current.scrollZoom.disable();
-    map.current.addControl(new mapboxgl.FullscreenControl(), 'top-right');
-
-    // Add atmosphere and fog effects
-    map.current.on('style.load', () => {
-      setIsMapLoaded(true);
-      map.current?.setFog({
-        color: 'rgb(10, 25, 40)',
-        'high-color': 'rgb(30, 60, 100)',
-        'horizon-blend': 0.1,
-        'space-color': 'rgb(5, 10, 20)',
-        'star-intensity': 0.3,
-      });
-    });
-
-    // Add click event listener
-    map.current.on('click', (e) => {
-      const { lng, lat } = e.lngLat;
+// Map click handler component
+const MapClickHandler: React.FC<{ onLocationSelect?: (coordinates: { lat: number; lng: number }) => void }> = ({ onLocationSelect }) => {
+  useMapEvents({
+    click: (e) => {
+      const { lat, lng } = e.latlng;
       onLocationSelect?.({ lat, lng });
-    });
+    },
+  });
+  return null;
+};
 
-    // Auto-rotate globe
-    let userInteracting = false;
-    const spinEnabled = true;
-    const secondsPerRevolution = 240;
-    
-    function spinGlobe() {
-      if (!map.current || !spinEnabled || userInteracting) return;
-      
-      const zoom = map.current.getZoom();
-      if (zoom < 3) {
-        const center = map.current.getCenter();
-        center.lng -= 360 / secondsPerRevolution;
-        map.current.easeTo({ center, duration: 1000, easing: (n) => n });
-      }
-    }
+const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocation }) => {
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [selectedLayers, setSelectedLayers] = useState({
+    temperature: false,
+    precipitation: false,
+    airQuality: false,
+  });
 
-    // Event listeners for interaction
-    map.current.on('mousedown', () => { userInteracting = true; });
-    map.current.on('dragstart', () => { userInteracting = true; });
-    map.current.on('mouseup', () => { 
-      userInteracting = false; 
-      setTimeout(spinGlobe, 2000);
-    });
-    map.current.on('touchend', () => { 
-      userInteracting = false; 
-      setTimeout(spinGlobe, 2000);
-    });
-    map.current.on('moveend', spinGlobe);
-
-    // Start spinning
-    setTimeout(spinGlobe, 2000);
-
-    // Cleanup
-    return () => {
-      map.current?.remove();
-    };
-  }, [onLocationSelect]);
-
-  // Update marker when location changes
   useEffect(() => {
-    if (!map.current || !selectedLocation) return;
+    // Map is loaded when component mounts
+    setIsMapLoaded(true);
+  }, []);
 
-    // Remove existing marker
-    if (marker.current) {
-      marker.current.remove();
-    }
-
-    // Create new marker with climate-themed styling
-    const el = document.createElement('div');
-    el.className = 'climate-marker';
-    el.style.cssText = `
-      width: 24px;
-      height: 24px;
-      background: linear-gradient(135deg, #0ea5e9, #06b6d4);
-      border: 3px solid rgba(255, 255, 255, 0.8);
-      border-radius: 50%;
-      box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
-      cursor: pointer;
-      animation: pulse 2s infinite;
-    `;
-
-    marker.current = new mapboxgl.Marker(el)
-      .setLngLat([selectedLocation.lng, selectedLocation.lat])
-      .addTo(map.current);
-
-    // Fly to location
-    map.current.flyTo({
-      center: [selectedLocation.lng, selectedLocation.lat],
-      zoom: 8,
-      duration: 2000,
-    });
-  }, [selectedLocation]);
+  const handleLayerChange = (layerName: keyof typeof selectedLayers) => {
+    setSelectedLayers(prev => ({
+      ...prev,
+      [layerName]: !prev[layerName]
+    }));
+  };
 
   return (
     <div className="relative w-full h-full">
-      <div ref={mapContainer} className="absolute inset-0 rounded-lg overflow-hidden" />
-      
+      <MapContainer
+        center={[30, 20]}
+        zoom={2}
+        className="absolute inset-0 rounded-lg overflow-hidden z-0"
+        maxZoom={18}
+        minZoom={2}
+        worldCopyJump={true}
+      >
+        <LayersControl position="topright">
+          {/* Base layers */}
+          <LayersControl.BaseLayer checked name="OpenStreetMap">
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            />
+          </LayersControl.BaseLayer>
+          
+          <LayersControl.BaseLayer name="Satellite">
+            <TileLayer
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
+            />
+          </LayersControl.BaseLayer>
+          
+          <LayersControl.BaseLayer name="Terrain">
+            <TileLayer
+              url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://opentopomap.org/">OpenTopoMap</a> contributors'
+              maxZoom={17}
+            />
+          </LayersControl.BaseLayer>
+
+          {/* Climate overlay layers */}
+          <LayersControl.Overlay name="Temperature Data">
+            <TileLayer
+              url="https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo"
+              attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
+              opacity={0.6}
+            />
+          </LayersControl.Overlay>
+          
+          <LayersControl.Overlay name="Precipitation">
+            <TileLayer
+              url="https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo"
+              attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
+              opacity={0.6}
+            />
+          </LayersControl.Overlay>
+          
+          <LayersControl.Overlay name="Wind Speed">
+            <TileLayer
+              url="https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo"
+              attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
+              opacity={0.6}
+            />
+          </LayersControl.Overlay>
+        </LayersControl>
+
+        {/* Custom map click handler */}
+        <MapClickHandler onLocationSelect={onLocationSelect} />
+
+        {/* Selected location marker */}
+        {selectedLocation && (
+          <Marker 
+            position={[selectedLocation.lat, selectedLocation.lng]} 
+            icon={createClimateIcon()}
+          >
+            <Popup>
+              <div className="text-sm">
+                <strong>Selected Location</strong><br />
+                Lat: {selectedLocation.lat.toFixed(4)}<br />
+                Lng: {selectedLocation.lng.toFixed(4)}
+              </div>
+            </Popup>
+          </Marker>
+        )}
+      </MapContainer>
+
       {/* Climate data overlay controls */}
       <div className="absolute top-4 left-4 z-10 space-y-2">
         <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 space-y-2">
           <h3 className="text-sm font-semibold text-foreground">Climate Layers</h3>
           <div className="space-y-1">
             <label className="flex items-center space-x-2 text-xs">
-              <input type="checkbox" className="rounded border-border" />
+              <input 
+                type="checkbox" 
+                className="rounded border-border" 
+                checked={selectedLayers.temperature}
+                onChange={() => handleLayerChange('temperature')}
+              />
               <span>Temperature</span>
             </label>
             <label className="flex items-center space-x-2 text-xs">
-              <input type="checkbox" className="rounded border-border" />
+              <input 
+                type="checkbox" 
+                className="rounded border-border"
+                checked={selectedLayers.precipitation}
+                onChange={() => handleLayerChange('precipitation')}
+              />
               <span>Precipitation</span>
             </label>
             <label className="flex items-center space-x-2 text-xs">
-              <input type="checkbox" className="rounded border-border" />
+              <input 
+                type="checkbox" 
+                className="rounded border-border"
+                checked={selectedLayers.airQuality}
+                onChange={() => handleLayerChange('airQuality')}
+              />
               <span>Air Quality</span>
             </label>
           </div>
@@ -170,6 +197,23 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
         @keyframes pulse {
           0%, 100% { transform: scale(1); opacity: 1; }
           50% { transform: scale(1.2); opacity: 0.8; }
+        }
+        .custom-climate-marker {
+          background: transparent !important;
+          border: none !important;
+        }
+        .leaflet-control-layers {
+          background: hsl(var(--card)) !important;
+          border: 1px solid hsl(var(--border)) !important;
+          border-radius: 0.5rem !important;
+          color: hsl(var(--foreground)) !important;
+        }
+        .leaflet-control-layers-toggle {
+          background-image: none !important;
+          background-color: hsl(var(--primary)) !important;
+        }
+        .leaflet-control-layers label {
+          color: hsl(var(--foreground)) !important;
         }
       `}</style>
     </div>

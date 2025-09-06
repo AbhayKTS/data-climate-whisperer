@@ -27,61 +27,71 @@ const LocationSearch: React.FC<LocationSearchProps> = ({
   const debounceRef = useRef<NodeJS.Timeout>();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Mock geocoding function - in production, this would use Mapbox Geocoding API
+  // Search using Nominatim (OpenStreetMap's geocoding service)
   const searchLocations = useCallback(async (searchQuery: string): Promise<LocationResult[]> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Mock data - in production, this would be replaced with actual Mapbox Geocoding API
-    const mockResults: LocationResult[] = [
-      {
-        id: '1',
-        name: 'New York City',
-        coordinates: { lat: 40.7128, lng: -74.0060 },
-        type: 'city',
-        country: 'United States'
-      },
-      {
-        id: '2',
-        name: 'London',
-        coordinates: { lat: 51.5074, lng: -0.1278 },
-        type: 'city',
-        country: 'United Kingdom'
-      },
-      {
-        id: '3',
-        name: 'Tokyo',
-        coordinates: { lat: 35.6762, lng: 139.6503 },
-        type: 'city',
-        country: 'Japan'
-      },
-      {
-        id: '4',
-        name: 'São Paulo',
-        coordinates: { lat: -23.5505, lng: -46.6333 },
-        type: 'city',
-        country: 'Brazil'
-      },
-      {
-        id: '5',
-        name: 'Cairo',
-        coordinates: { lat: 30.0444, lng: 31.2357 },
-        type: 'city',
-        country: 'Egypt'
-      },
-      {
-        id: '6',
-        name: 'Sydney',
-        coordinates: { lat: -33.8688, lng: 151.2093 },
-        type: 'city',
-        country: 'Australia'
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        new URLSearchParams({
+          q: searchQuery,
+          format: 'json',
+          limit: '10',
+          addressdetails: '1',
+          countrycodes: '', // Add country codes if needed
+        })
+      );
+      
+      if (!response.ok) {
+        throw new Error('Geocoding request failed');
       }
-    ];
-
-    return mockResults.filter(location => 
-      location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      location.country?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+      
+      const data = await response.json();
+      
+      const results: LocationResult[] = data.map((item: any) => ({
+        id: item.place_id.toString(),
+        name: item.display_name.split(',')[0], // Get main location name
+        coordinates: { 
+          lat: parseFloat(item.lat), 
+          lng: parseFloat(item.lon) 
+        },
+        type: item.type || 'place',
+        country: item.address?.country || undefined
+      }));
+      
+      return results;
+    } catch (error) {
+      console.error('Error searching locations:', error);
+      
+      // Fallback to mock data if Nominatim fails
+      const mockResults: LocationResult[] = [
+        {
+          id: '1',
+          name: 'New York City',
+          coordinates: { lat: 40.7128, lng: -74.0060 },
+          type: 'city',
+          country: 'United States'
+        },
+        {
+          id: '2',
+          name: 'London',
+          coordinates: { lat: 51.5074, lng: -0.1278 },
+          type: 'city',
+          country: 'United Kingdom'
+        },
+        {
+          id: '3',
+          name: 'Tokyo',
+          coordinates: { lat: 35.6762, lng: 139.6503 },
+          type: 'city',
+          country: 'Japan'
+        }
+      ];
+      
+      return mockResults.filter(location => 
+        location.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        location.country?.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
   }, []);
 
   const handleSearch = useCallback(async (searchQuery: string) => {
