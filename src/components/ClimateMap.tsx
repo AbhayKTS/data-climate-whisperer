@@ -67,7 +67,7 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
           worldCopyJump: true,
         });
 
-        // Add base tile layer
+        // Add English base tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(leafletMap);
@@ -98,53 +98,105 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
     };
   }, []);
 
-  // Handle layer changes
+  // Handle layer changes with better state management
   useEffect(() => {
     if (!map || !isMapLoaded) return;
 
-    try {
-      // Temperature layer
-      if (selectedLayers.temperature && !climateLayers.temperature) {
-        const tempLayer = L.tileLayer('https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo', {
-          attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-          opacity: 0.6
-        });
-        tempLayer.addTo(map);
-        setClimateLayers(prev => ({ ...prev, temperature: tempLayer }));
-      } else if (!selectedLayers.temperature && climateLayers.temperature) {
-        map.removeLayer(climateLayers.temperature);
-        setClimateLayers(prev => ({ ...prev, temperature: undefined }));
-      }
+    const updateLayers = async () => {
+      try {
+        // Temperature layer
+        if (selectedLayers.temperature) {
+          if (!climateLayers.temperature) {
+            console.log('Adding temperature layer');
+            const tempLayer = L.tileLayer('https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo', {
+              attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+              opacity: 0.6,
+              maxZoom: 18
+            });
+            
+            map.whenReady(() => {
+              tempLayer.addTo(map);
+              console.log('Temperature layer added to map');
+            });
+            
+            setClimateLayers(prev => ({ ...prev, temperature: tempLayer }));
+          }
+        } else {
+          if (climateLayers.temperature) {
+            console.log('Removing temperature layer');
+            try {
+              map.removeLayer(climateLayers.temperature);
+              setClimateLayers(prev => ({ ...prev, temperature: undefined }));
+            } catch (e) {
+              console.log('Layer already removed');
+            }
+          }
+        }
 
-      // Precipitation layer
-      if (selectedLayers.precipitation && !climateLayers.precipitation) {
-        const precipLayer = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo', {
-          attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-          opacity: 0.6
-        });
-        precipLayer.addTo(map);
-        setClimateLayers(prev => ({ ...prev, precipitation: precipLayer }));
-      } else if (!selectedLayers.precipitation && climateLayers.precipitation) {
-        map.removeLayer(climateLayers.precipitation);
-        setClimateLayers(prev => ({ ...prev, precipitation: undefined }));
-      }
+        // Precipitation layer
+        if (selectedLayers.precipitation) {
+          if (!climateLayers.precipitation) {
+            console.log('Adding precipitation layer');
+            const precipLayer = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo', {
+              attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+              opacity: 0.6,
+              maxZoom: 18
+            });
+            
+            map.whenReady(() => {
+              precipLayer.addTo(map);
+              console.log('Precipitation layer added to map');
+            });
+            
+            setClimateLayers(prev => ({ ...prev, precipitation: precipLayer }));
+          }
+        } else {
+          if (climateLayers.precipitation) {
+            console.log('Removing precipitation layer');
+            try {
+              map.removeLayer(climateLayers.precipitation);
+              setClimateLayers(prev => ({ ...prev, precipitation: undefined }));
+            } catch (e) {
+              console.log('Layer already removed');
+            }
+          }
+        }
 
-      // Air quality layer
-      if (selectedLayers.airQuality && !climateLayers.airQuality) {
-        const airLayer = L.tileLayer('https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo', {
-          attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-          opacity: 0.6
-        });
-        airLayer.addTo(map);
-        setClimateLayers(prev => ({ ...prev, airQuality: airLayer }));
-      } else if (!selectedLayers.airQuality && climateLayers.airQuality) {
-        map.removeLayer(climateLayers.airQuality);
-        setClimateLayers(prev => ({ ...prev, airQuality: undefined }));
+        // Wind patterns layer (using wind as air quality proxy)
+        if (selectedLayers.airQuality) {
+          if (!climateLayers.airQuality) {
+            console.log('Adding wind patterns layer');
+            const windLayer = L.tileLayer('https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo', {
+              attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+              opacity: 0.5,
+              maxZoom: 18
+            });
+            
+            map.whenReady(() => {
+              windLayer.addTo(map);
+              console.log('Wind patterns layer added to map');
+            });
+            
+            setClimateLayers(prev => ({ ...prev, airQuality: windLayer }));
+          }
+        } else {
+          if (climateLayers.airQuality) {
+            console.log('Removing wind patterns layer');
+            try {
+              map.removeLayer(climateLayers.airQuality);
+              setClimateLayers(prev => ({ ...prev, airQuality: undefined }));
+            } catch (e) {
+              console.log('Layer already removed');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error handling layer changes:', error);
       }
-    } catch (error) {
-      console.error('Error handling layer changes:', error);
-    }
-  }, [map, selectedLayers, climateLayers, isMapLoaded]);
+    };
+
+    updateLayers();
+  }, [map, selectedLayers, isMapLoaded]);
 
   // Handle selected location marker
   useEffect(() => {
@@ -210,32 +262,32 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
         <div className="bg-card/90 backdrop-blur-sm border border-border rounded-lg p-3 space-y-2">
           <h3 className="text-sm font-semibold text-foreground">Climate Layers</h3>
           <div className="space-y-1">
-            <label className="flex items-center space-x-2 text-xs">
+            <label className="flex items-center space-x-2 text-xs cursor-pointer">
               <input 
                 type="checkbox" 
-                className="rounded border-border" 
+                className="rounded border-border cursor-pointer" 
                 checked={selectedLayers.temperature}
                 onChange={() => handleLayerChange('temperature')}
               />
               <span>Temperature</span>
             </label>
-            <label className="flex items-center space-x-2 text-xs">
+            <label className="flex items-center space-x-2 text-xs cursor-pointer">
               <input 
                 type="checkbox" 
-                className="rounded border-border"
+                className="rounded border-border cursor-pointer"
                 checked={selectedLayers.precipitation}
                 onChange={() => handleLayerChange('precipitation')}
               />
               <span>Precipitation</span>
             </label>
-            <label className="flex items-center space-x-2 text-xs">
+            <label className="flex items-center space-x-2 text-xs cursor-pointer">
               <input 
                 type="checkbox" 
-                className="rounded border-border"
+                className="rounded border-border cursor-pointer"
                 checked={selectedLayers.airQuality}
                 onChange={() => handleLayerChange('airQuality')}
               />
-              <span>Air Quality</span>
+              <span>Wind Patterns</span>
             </label>
           </div>
         </div>
