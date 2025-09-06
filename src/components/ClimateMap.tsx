@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import MapErrorBoundary from './MapErrorBoundary';
-import { WORKING_CLIMATE_LAYERS, FALLBACK_LAYERS } from './WorkingClimateLayers';
+import { WORKING_CLIMATE_LAYERS, FALLBACK_LAYERS, createTemperatureOverlay } from './WorkingClimateLayers';
 
 // Fix for default markers in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -15,6 +15,12 @@ L.Icon.Default.mergeOptions({
 interface ClimateMapProps {
   onLocationSelect?: (coordinates: { lat: number; lng: number }, address?: string) => void;
   selectedLocation?: { lat: number; lng: number } | null;
+  climateData?: {
+    currentWeather?: {
+      temperature: number;
+      windSpeed: number;
+    };
+  };
 }
 
 // Custom climate marker icon
@@ -37,7 +43,7 @@ const createClimateIcon = () => {
   });
 };
 
-const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocation }) => {
+const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocation, climateData }) => {
   const [map, setMap] = useState<L.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [selectedLayers, setSelectedLayers] = useState({
@@ -110,34 +116,40 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
     let layer: L.TileLayer;
 
     try {
-      // First try the main service
-      layer = L.tileLayer(config.url, {
-        attribution: config.attribution,
-        opacity: config.opacity,
-        maxZoom: 18,
-        errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQIHWNgAAIAAAUAAY27m/MAAAAASUVORK5CYII=' // transparent pixel
-      });
+      // For temperature, use live data if available
+      if (layerType === 'temperature' && climateData?.currentWeather?.temperature !== undefined && selectedLocation) {
+        const liveLayer = FALLBACK_LAYERS.temperature.createLayer(
+          climateData.currentWeather.temperature,
+          selectedLocation.lat,
+          selectedLocation.lng
+        );
+        return L.tileLayer(liveLayer.url, {
+          attribution: liveLayer.attribution,
+          opacity: liveLayer.opacity,
+          maxZoom: 18
+        });
+      }
 
-      // If fallback is available, create fallback layer
-      if (config.fallback && FALLBACK_LAYERS[layerType]) {
+      // For precipitation, use RainViewer (known working)
+      if (layerType === 'precipitation') {
+        return L.tileLayer(config.url, {
+          attribution: config.attribution,
+          opacity: config.opacity,
+          maxZoom: 18
+        });
+      }
+
+      // For other layers, create fallback immediately since API services don't work
+      if (FALLBACK_LAYERS[layerType]) {
         const fallbackConfig = FALLBACK_LAYERS[layerType].createLayer();
-        const fallbackLayer = L.tileLayer(fallbackConfig.url, {
+        return L.tileLayer(fallbackConfig.url, {
           attribution: fallbackConfig.attribution,
           opacity: fallbackConfig.opacity,
           maxZoom: 18
         });
-
-        // Add error handling to switch to fallback
-        layer.on('tileerror', () => {
-          console.log(`Main ${layerType} layer failed, switching to fallback`);
-          if (map && map.hasLayer(layer)) {
-            map.removeLayer(layer);
-            fallbackLayer.addTo(map);
-          }
-        });
       }
 
-      return layer;
+      return null;
     } catch (error) {
       console.error(`Error creating ${layerType} layer:`, error);
       // Return fallback layer if available
@@ -151,7 +163,7 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
       }
       return null;
     }
-  }, [map]);
+  }, [map, climateData, selectedLocation]);
 
   // Handle layer changes with improved reliability
   useEffect(() => {
@@ -287,6 +299,15 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
               />
               <span className="flex items-center gap-1">
                 Temperature
+                {climateData?.currentWeather?.temperature !== undefined && selectedLocation ? (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800">
+                    Live
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                    Demo
+                  </span>
+                )}
                 {layerLoadingState.temperature && (
                   <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
                 )}
@@ -301,6 +322,9 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
               />
               <span className="flex items-center gap-1">
                 Precipitation
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-800">
+                  Live
+                </span>
                 {layerLoadingState.precipitation && (
                   <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
                 )}
@@ -315,6 +339,9 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
               />
               <span className="flex items-center gap-1">
                 Wind Patterns
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                  Demo
+                </span>
                 {layerLoadingState.wind && (
                   <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
                 )}

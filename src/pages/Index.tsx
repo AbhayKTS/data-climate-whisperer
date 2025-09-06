@@ -219,10 +219,11 @@ const Index = () => {
 
       {/* Main Map Area */}
       <div className="flex-1 relative">
-        <ClimateMap 
-          onLocationSelect={handleMapClick}
-          selectedLocation={selectedLocation}
-        />
+            <ClimateMap 
+              onLocationSelect={handleMapClick}
+              selectedLocation={selectedLocation}
+              climateData={climateData}
+            />
         
         {/* Attribution */}
         <div className="absolute bottom-4 right-4 bg-card/90 backdrop-blur-sm border border-border rounded-lg p-2">
