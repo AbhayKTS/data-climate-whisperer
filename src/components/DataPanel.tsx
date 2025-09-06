@@ -151,7 +151,7 @@ export const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
   }
 
   return (
-    <div className="h-full flex flex-col space-y-4 p-4 overflow-hidden">
+    <div className="h-full overflow-y-auto p-4 space-y-4">
       {/* Header */}
       <div className="flex-shrink-0">
         <h2 className="text-xl font-bold text-foreground mb-1">{data.location}</h2>
@@ -171,14 +171,14 @@ export const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex-1 overflow-hidden">
-        <Tabs defaultValue="overview" className="h-full flex flex-col">
-          <TabsList className="flex-shrink-0 grid w-full grid-cols-2">
+      <div className="w-full">
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="flex-1 overflow-y-auto space-y-4 mt-4">
+          <TabsContent value="overview" className="space-y-4 mt-4">
             {/* Temperature */}
             <Card>
               <CardHeader className="pb-2">
@@ -376,7 +376,7 @@ export const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="analytics" className="flex-1 overflow-y-auto mt-4">
+        <TabsContent value="analytics" className="mt-4">
           <ClimateChartsContainer data={data} />
         </TabsContent>
       </Tabs>
