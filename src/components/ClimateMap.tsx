@@ -53,111 +53,141 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
 
   // Initialize map
   useEffect(() => {
-    const mapContainer = document.getElementById('map-container');
-    if (!mapContainer || map) return;
+    // Add a delay to ensure DOM is ready
+    const timer = setTimeout(() => {
+      const mapContainer = document.getElementById('map-container');
+      if (!mapContainer || map) return;
 
-    try {
-      const leafletMap = L.map('map-container', {
-        center: [30, 20],
-        zoom: 2,
-        maxZoom: 18,
-        minZoom: 2,
-        worldCopyJump: true,
-      });
+      try {
+        const leafletMap = L.map('map-container', {
+          center: [30, 20],
+          zoom: 2,
+          maxZoom: 18,
+          minZoom: 2,
+          worldCopyJump: true,
+        });
 
-      // Add base tile layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(leafletMap);
+        // Add base tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(leafletMap);
 
-      // Add click handler
-      leafletMap.on('click', (e) => {
-        const { lat, lng } = e.latlng;
-        onLocationSelect?.({ lat, lng });
-      });
+        // Add click handler
+        leafletMap.on('click', (e) => {
+          const { lat, lng } = e.latlng;
+          onLocationSelect?.({ lat, lng });
+        });
 
-      setMap(leafletMap);
-      setIsMapLoaded(true);
+        setMap(leafletMap);
+        setIsMapLoaded(true);
+      } catch (error) {
+        console.error('Error initializing map:', error);
+        setIsMapLoaded(true); // Set to true even on error to show fallback
+      }
+    }, 100);
 
-      return () => {
-        leafletMap.remove();
-      };
-    } catch (error) {
-      console.error('Error initializing map:', error);
-    }
-  }, [onLocationSelect]);
+    return () => {
+      clearTimeout(timer);
+      if (map) {
+        try {
+          map.remove();
+        } catch (error) {
+          console.error('Error removing map:', error);
+        }
+      }
+    };
+  }, []);
 
   // Handle layer changes
   useEffect(() => {
-    if (!map) return;
+    if (!map || !isMapLoaded) return;
 
-    // Temperature layer
-    if (selectedLayers.temperature && !climateLayers.temperature) {
-      const tempLayer = L.tileLayer('https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo', {
-        attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-        opacity: 0.6
-      });
-      tempLayer.addTo(map);
-      setClimateLayers(prev => ({ ...prev, temperature: tempLayer }));
-    } else if (!selectedLayers.temperature && climateLayers.temperature) {
-      map.removeLayer(climateLayers.temperature);
-      setClimateLayers(prev => ({ ...prev, temperature: undefined }));
-    }
+    try {
+      // Temperature layer
+      if (selectedLayers.temperature && !climateLayers.temperature) {
+        const tempLayer = L.tileLayer('https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo', {
+          attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+          opacity: 0.6
+        });
+        tempLayer.addTo(map);
+        setClimateLayers(prev => ({ ...prev, temperature: tempLayer }));
+      } else if (!selectedLayers.temperature && climateLayers.temperature) {
+        map.removeLayer(climateLayers.temperature);
+        setClimateLayers(prev => ({ ...prev, temperature: undefined }));
+      }
 
-    // Precipitation layer
-    if (selectedLayers.precipitation && !climateLayers.precipitation) {
-      const precipLayer = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo', {
-        attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-        opacity: 0.6
-      });
-      precipLayer.addTo(map);
-      setClimateLayers(prev => ({ ...prev, precipitation: precipLayer }));
-    } else if (!selectedLayers.precipitation && climateLayers.precipitation) {
-      map.removeLayer(climateLayers.precipitation);
-      setClimateLayers(prev => ({ ...prev, precipitation: undefined }));
-    }
+      // Precipitation layer
+      if (selectedLayers.precipitation && !climateLayers.precipitation) {
+        const precipLayer = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo', {
+          attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+          opacity: 0.6
+        });
+        precipLayer.addTo(map);
+        setClimateLayers(prev => ({ ...prev, precipitation: precipLayer }));
+      } else if (!selectedLayers.precipitation && climateLayers.precipitation) {
+        map.removeLayer(climateLayers.precipitation);
+        setClimateLayers(prev => ({ ...prev, precipitation: undefined }));
+      }
 
-    // Air quality layer
-    if (selectedLayers.airQuality && !climateLayers.airQuality) {
-      const airLayer = L.tileLayer('https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo', {
-        attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-        opacity: 0.6
-      });
-      airLayer.addTo(map);
-      setClimateLayers(prev => ({ ...prev, airQuality: airLayer }));
-    } else if (!selectedLayers.airQuality && climateLayers.airQuality) {
-      map.removeLayer(climateLayers.airQuality);
-      setClimateLayers(prev => ({ ...prev, airQuality: undefined }));
+      // Air quality layer
+      if (selectedLayers.airQuality && !climateLayers.airQuality) {
+        const airLayer = L.tileLayer('https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo', {
+          attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+          opacity: 0.6
+        });
+        airLayer.addTo(map);
+        setClimateLayers(prev => ({ ...prev, airQuality: airLayer }));
+      } else if (!selectedLayers.airQuality && climateLayers.airQuality) {
+        map.removeLayer(climateLayers.airQuality);
+        setClimateLayers(prev => ({ ...prev, airQuality: undefined }));
+      }
+    } catch (error) {
+      console.error('Error handling layer changes:', error);
     }
-  }, [map, selectedLayers, climateLayers]);
+  }, [map, selectedLayers, climateLayers, isMapLoaded]);
 
   // Handle selected location marker
   useEffect(() => {
-    if (!map) return;
+    if (!map || !isMapLoaded) return;
 
-    // Remove existing marker
-    if (marker) {
-      map.removeLayer(marker);
-      setMarker(null);
+    try {
+      // Remove existing marker
+      if (marker) {
+        map.removeLayer(marker);
+        setMarker(null);
+      }
+
+      // Add new marker if location selected
+      if (selectedLocation) {
+        // Ensure map container exists before adding marker
+        const mapContainer = map.getContainer();
+        if (!mapContainer) return;
+
+        const newMarker = L.marker([selectedLocation.lat, selectedLocation.lng], {
+          icon: createClimateIcon()
+        });
+
+        // Use whenReady to ensure map is fully initialized
+        map.whenReady(() => {
+          try {
+            newMarker.addTo(map);
+            newMarker.bindPopup(`
+              <div style="font-size: 12px;">
+                <strong>Selected Location</strong><br />
+                Lat: ${selectedLocation.lat.toFixed(4)}<br />
+                Lng: ${selectedLocation.lng.toFixed(4)}
+              </div>
+            `);
+            setMarker(newMarker);
+          } catch (error) {
+            console.error('Error adding marker:', error);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error handling marker:', error);
     }
-
-    // Add new marker if location selected
-    if (selectedLocation) {
-      const newMarker = L.marker([selectedLocation.lat, selectedLocation.lng], {
-        icon: createClimateIcon()
-      }).addTo(map);
-
-      newMarker.bindPopup(`
-        <div style="font-size: 12px;">
-          <strong>Selected Location</strong><br />
-          Lat: ${selectedLocation.lat.toFixed(4)}<br />
-          Lng: ${selectedLocation.lng.toFixed(4)}
-        </div>
-      `);
-
-      setMarker(newMarker);
-    }
-  }, [map, selectedLocation, marker]);
+  }, [map, selectedLocation, isMapLoaded]);
 
   const handleLayerChange = useCallback((layerName: keyof typeof selectedLayers) => {
     setSelectedLayers(prev => ({
