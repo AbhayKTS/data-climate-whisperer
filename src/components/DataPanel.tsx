@@ -195,15 +195,15 @@ const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
             <div className="grid grid-cols-3 gap-2">
               <div className="p-2 bg-muted/30 rounded text-center">
                 <div className="text-xs text-muted-foreground">24h</div>
-                <div className="text-sm font-bold">{data.precipitation.cumulative?.last24h || 0}mm</div>
+                <div className="text-sm font-bold">{(data.precipitation.cumulative?.last24h || 0).toFixed(1)}mm</div>
               </div>
               <div className="p-2 bg-muted/30 rounded text-center">
                 <div className="text-xs text-muted-foreground">7d</div>
-                <div className="text-sm font-bold">{data.precipitation.cumulative?.last7days || 0}mm</div>
+                <div className="text-sm font-bold">{(data.precipitation.cumulative?.last7days || 0).toFixed(1)}mm</div>
               </div>
               <div className="p-2 bg-muted/30 rounded text-center">
                 <div className="text-xs text-muted-foreground">30d</div>
-                <div className="text-sm font-bold">{data.precipitation.cumulative?.last30days || 0}mm</div>
+                <div className="text-sm font-bold">{(data.precipitation.cumulative?.last30days || 0).toFixed(1)}mm</div>
               </div>
             </div>
             
