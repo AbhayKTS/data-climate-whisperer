@@ -17,6 +17,11 @@ interface ClimateData {
     current: number;
     trend: number;
     data: Array<{ date: string; value: number; anomaly?: boolean }>;
+    cumulative?: {
+      last24h: number;
+      last7days: number;
+      last30days: number;
+    };
   };
   airQuality: {
     index: number;
@@ -185,22 +190,28 @@ const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-32 flex items-end space-x-1">
-            {data.precipitation.data.map((item, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center space-y-1">
-                <div 
-                  className={`w-full bg-primary/30 rounded-t transition-all duration-300 ${
-                    item.anomaly ? 'bg-destructive/30' : ''
-                  }`}
-                  style={{ 
-                    height: `${(item.value / 1000) * 100}%`,
-                    minHeight: '4px'
-                  }}
-                />
-                <div className="text-xs text-muted-foreground">{item.date}</div>
-                <div className="text-xs font-mono">{item.value}mm</div>
+          <div className="space-y-3">
+            {/* Precipitation Totals */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="p-2 bg-muted/30 rounded text-center">
+                <div className="text-xs text-muted-foreground">24h</div>
+                <div className="text-sm font-bold">{data.precipitation.cumulative?.last24h || 0}mm</div>
               </div>
-            ))}
+              <div className="p-2 bg-muted/30 rounded text-center">
+                <div className="text-xs text-muted-foreground">7d</div>
+                <div className="text-sm font-bold">{data.precipitation.cumulative?.last7days || 0}mm</div>
+              </div>
+              <div className="p-2 bg-muted/30 rounded text-center">
+                <div className="text-xs text-muted-foreground">30d</div>
+                <div className="text-sm font-bold">{data.precipitation.cumulative?.last30days || 0}mm</div>
+              </div>
+            </div>
+            
+            {/* Current Rate */}
+            <div className="flex items-center justify-between p-3 bg-primary/10 rounded-lg">
+              <span className="text-sm">Current Rate</span>
+              <span className="text-lg font-bold">{data.precipitation.current}mm/h</span>
+            </div>
           </div>
         </CardContent>
       </Card>
