@@ -13,12 +13,12 @@ interface ClimateData {
   temperature: {
     current: number;
     trend: number;
-    data: Array<{ date: string; value: number; anomaly?: boolean; historical?: number }>;
+    data: Array<{ date: string; temperature?: number; value?: number; min?: number; max?: number; anomaly?: boolean; historical?: number }>;
   };
   precipitation: {
     current: number;
     trend: number;
-    data: Array<{ date: string; value: number; anomaly?: boolean; historical?: number }>;
+    data: Array<{ date: string; amount?: number; value?: number; intensity?: string; anomaly?: boolean; historical?: number; hours?: number }>;
   };
   airQuality: {
     index: number;
@@ -44,42 +44,7 @@ interface ClimateChartsContainerProps {
 }
 
 const ClimateChartsContainer: React.FC<ClimateChartsContainerProps> = ({ data }) => {
-  // Generate mock historical and trend data for demonstration
-  // In a real app, this would come from the API
-  const generateMockTrendData = (current: number, type: 'temperature' | 'precipitation') => {
-    const days = 30;
-    const mockData = [];
-    
-    for (let i = days; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      
-      let value;
-      if (type === 'temperature') {
-        // Generate temperature variation around current value
-        const variation = (Math.random() - 0.5) * 10;
-        value = current + variation;
-        
-        // Add some seasonal pattern
-        const seasonalVariation = Math.sin((date.getMonth() / 12) * 2 * Math.PI) * 5;
-        value += seasonalVariation;
-      } else {
-        // Generate precipitation data (more random, often zero)
-        value = Math.random() < 0.7 ? 0 : Math.random() * 50;
-      }
-      
-      mockData.push({
-        date: date.toISOString().split('T')[0],
-        value: Math.round(value * 10) / 10,
-        anomaly: Math.random() < 0.1, // 10% chance of anomaly
-        historical: type === 'temperature' ? current - 2 : current * 0.8 // Mock historical average
-      });
-    }
-    
-    return mockData;
-  };
-
-  // Generate mock air quality historical data
+  // Generate mock air quality historical data only when needed
   const generateMockAQIData = (current: number) => {
     const days = 30;
     const mockData = [];
@@ -115,33 +80,26 @@ const ClimateChartsContainer: React.FC<ClimateChartsContainerProps> = ({ data })
     return mockData;
   };
 
-  const temperatureData = data.temperature.data.length > 0 
+  // Use real data from API - ensure data exists and has proper format
+  const temperatureData = data.temperature?.data?.length > 0 
     ? data.temperature.data.map(item => ({
         date: item.date,
-        temperature: item.value,
-        anomaly: item.anomaly,
+        temperature: item.temperature || item.value,
+        min: item.min,
+        max: item.max,
         historical: item.historical
       }))
-    : generateMockTrendData(data.temperature.current, 'temperature').map(item => ({
-        date: item.date,
-        temperature: item.value,
-        anomaly: item.anomaly,
-        historical: item.historical
-      }));
+    : [];
 
-  const precipitationData = data.precipitation.data.length > 0
+  const precipitationData = data.precipitation?.data?.length > 0
     ? data.precipitation.data.map(item => ({
         date: item.date,
-        precipitation: item.value,
-        anomaly: item.anomaly,
+        precipitation: Math.max(0, item.amount || item.value || 0), // Ensure non-negative and use expected field name
+        intensity: item.intensity as 'light' | 'moderate' | 'heavy' | 'extreme' || 'light',
+        anomaly: item.anomaly || false,
         historical: item.historical
       }))
-    : generateMockTrendData(data.precipitation.current, 'precipitation').map(item => ({
-        date: item.date,
-        precipitation: item.value,
-        anomaly: item.anomaly,
-        historical: item.historical
-      }));
+    : [];
 
   const airQualityData = generateMockAQIData(data.airQuality.index);
 
@@ -214,17 +172,18 @@ const ClimateChartsContainer: React.FC<ClimateChartsContainerProps> = ({ data })
             current={data.temperature.current}
             unit="°C"
             trend={data.temperature.trend}
-            anomaly={data.rawData?.temperature?.anomaly}
+            anomaly={data.rawData?.temperature?.anomaly || 0}
           />
         </TabsContent>
         
         <TabsContent value="precipitation" className="mt-6">
           <PrecipitationChart
             data={precipitationData}
-            current={data.precipitation.current}
+            currentPrecip={data.precipitation.current}
             unit="mm"
             trend={data.precipitation.trend}
             historicalAverage={data.rawData?.precipitation?.historical_average}
+            cumulative={data.rawData?.precipitation?.cumulative}
           />
         </TabsContent>
         

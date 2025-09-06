@@ -21,13 +21,19 @@ serve(async (req) => {
     // This provides actual weather station data, not forecast models
     const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m&timezone=UTC&_t=${Date.now()}`;
     
-    // Historical climate data (last 30 years using archive API)
-    const historicalUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=1993-01-01&end_date=2022-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
+    // Recent historical data (last 2 years for detailed charts) and long-term average
+    const recentDate = new Date();
+    recentDate.setFullYear(recentDate.getFullYear() - 2);
+    const recentStartDate = recentDate.toISOString().split('T')[0];
+    const currentDate = new Date().toISOString().split('T')[0];
+    
+    const recentHistoricalUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${recentStartDate}&end_date=${currentDate}&daily=temperature_2m_mean,temperature_2m_min,temperature_2m_max,precipitation_sum,precipitation_hours,wind_speed_10m_max,relative_humidity_2m_mean&timezone=auto`;
+    const longTermUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=1993-01-01&end_date=2022-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
 
     console.log('Fetching current weather from:', currentWeatherUrl);
     console.log('Fetching historical data from:', historicalUrl);
 
-    const [currentResponse, historicalResponse] = await Promise.all([
+    const [currentResponse, recentHistoricalResponse, longTermResponse] = await Promise.all([
       fetch(currentWeatherUrl, {
         headers: {
           'Cache-Control': 'no-cache',
@@ -37,8 +43,12 @@ serve(async (req) => {
         console.error('Current weather fetch failed:', err);
         return { ok: false, status: 500, statusText: 'Network error' };
       }),
-      fetch(historicalUrl).catch(err => {
-        console.error('Historical data fetch failed:', err);
+      fetch(recentHistoricalUrl).catch(err => {
+        console.error('Recent historical data fetch failed:', err);
+        return { ok: false, status: 500, statusText: 'Network error' };
+      }),
+      fetch(longTermUrl).catch(err => {
+        console.error('Long-term data fetch failed:', err);
         return { ok: false, status: 500, statusText: 'Network error' };
       })
     ]);
@@ -48,9 +58,12 @@ serve(async (req) => {
       throw new Error(`Failed to fetch current weather data: ${currentResponse.status}`);
     }
 
-    if (!historicalResponse.ok) {
-      console.warn('Historical data API error:', historicalResponse.status, historicalResponse.statusText);
-      // Continue without historical data
+    if (!recentHistoricalResponse.ok) {
+      console.warn('Recent historical data API error:', recentHistoricalResponse.status, recentHistoricalResponse.statusText);
+    }
+    
+    if (!longTermResponse.ok) {
+      console.warn('Long-term data API error:', longTermResponse.status, longTermResponse.statusText);
     }
 
     const currentData = await currentResponse.json();
@@ -90,34 +103,67 @@ serve(async (req) => {
       console.log(`Weather data is fresh: ${minutesDiff.toFixed(1)} minutes old`);
     }
 
-    let historicalData = null;
+    let recentHistoricalData = null;
+    let longTermData = null;
     let tempAnomaly = 0;
     let historicalPrecipAvg = 0;
+    let cumulativePrecipitation = {
+      last24h: 0,
+      last7days: 0,
+      last30days: 0
+    };
 
-    // Process historical data if available
-    if (historicalResponse.ok) {
+    // Process recent historical data (for detailed charts)
+    if (recentHistoricalResponse.ok) {
       try {
-        historicalData = await historicalResponse.json();
-        console.log('Historical data received:', Object.keys(historicalData));
+        recentHistoricalData = await recentHistoricalResponse.json();
+        console.log('Recent historical data received:', Object.keys(recentHistoricalData));
         
-        if (historicalData.daily && historicalData.daily.temperature_2m_mean) {
+        if (recentHistoricalData.daily) {
+          // Calculate cumulative precipitation
+          const dates = recentHistoricalData.daily.time || [];
+          const precipData = recentHistoricalData.daily.precipitation_sum || [];
+          const now = new Date();
+          
+          for (let i = 0; i < dates.length; i++) {
+            const date = new Date(dates[i]);
+            const daysDiff = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+            const precip = precipData[i] || 0;
+            
+            if (daysDiff <= 1) cumulativePrecipitation.last24h += precip;
+            if (daysDiff <= 7) cumulativePrecipitation.last7days += precip;
+            if (daysDiff <= 30) cumulativePrecipitation.last30days += precip;
+          }
+        }
+      } catch (error) {
+        console.error('Error processing recent historical data:', error);
+      }
+    }
+
+    // Process long-term data (for anomaly calculation)
+    if (longTermResponse.ok) {
+      try {
+        longTermData = await longTermResponse.json();
+        console.log('Long-term data received:', Object.keys(longTermData));
+        
+        if (longTermData.daily && longTermData.daily.temperature_2m_mean) {
           const currentTemp = currentData.current.temperature_2m;
-          const historicalTemps = historicalData.daily.temperature_2m_mean.filter((temp: number) => temp !== null);
+          const historicalTemps = longTermData.daily.temperature_2m_mean.filter((temp: number) => temp !== null);
           
           if (historicalTemps.length > 0) {
             const avgHistoricalTemp = historicalTemps.reduce((sum: number, temp: number) => sum + temp, 0) / historicalTemps.length;
             tempAnomaly = currentTemp - avgHistoricalTemp;
           }
           
-          if (historicalData.daily.precipitation_sum) {
-            const historicalPrecip = historicalData.daily.precipitation_sum.filter((precip: number) => precip !== null);
+          if (longTermData.daily.precipitation_sum) {
+            const historicalPrecip = longTermData.daily.precipitation_sum.filter((precip: number) => precip !== null);
             if (historicalPrecip.length > 0) {
               historicalPrecipAvg = historicalPrecip.reduce((sum: number, val: number) => sum + val, 0) / historicalPrecip.length;
             }
           }
         }
       } catch (error) {
-        console.error('Error processing historical data:', error);
+        console.error('Error processing long-term data:', error);
       }
     }
 
@@ -149,7 +195,8 @@ serve(async (req) => {
       precipitation: {
         current: currentData.current.precipitation || 0,
         unit: currentData.current_units?.precipitation || 'mm',
-        historical_average: Number(historicalPrecipAvg.toFixed(2))
+        historical_average: Number(historicalPrecipAvg.toFixed(2)),
+        cumulative: cumulativePrecipitation
       },
       wind: {
         speed: currentWindSpeed || 0,
@@ -167,7 +214,11 @@ serve(async (req) => {
       },
       weather_code: currentData.current.weather_code || 0,
       timestamp: currentData.current.time || new Date().toISOString(),
-      hasHistoricalData: historicalData !== null,
+      hasHistoricalData: recentHistoricalData !== null || longTermData !== null,
+      historicalData: {
+        recent: recentHistoricalData,
+        longTerm: longTermData
+      },
       dataSource: dataSource,
       dataFreshness: dataFreshness,
       dataAge: `${Math.abs(minutesDiff).toFixed(0)} minutes ago`

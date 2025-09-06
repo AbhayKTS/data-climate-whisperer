@@ -51,6 +51,40 @@ const Index = () => {
       const climate = climateResponse.data;
       const airQuality = airQualityResponse.data;
 
+      // Transform historical data to chart format
+      const transformTemperatureData = (historicalData: any) => {
+        if (!historicalData?.daily) return [];
+        
+        const dates = historicalData.daily.time || [];
+        const temps = historicalData.daily.temperature_2m_mean || [];
+        const minTemps = historicalData.daily.temperature_2m_min || [];
+        const maxTemps = historicalData.daily.temperature_2m_max || [];
+        
+        return dates.map((date: string, index: number) => ({
+          date,
+          temperature: temps[index] || null,
+          min: minTemps[index] || null,
+          max: maxTemps[index] || null,
+          historical: temps[index] || null
+        })).filter((item: any) => item.temperature !== null);
+      };
+
+      const transformPrecipitationData = (historicalData: any) => {
+        if (!historicalData?.daily) return [];
+        
+        const dates = historicalData.daily.time || [];
+        const precip = historicalData.daily.precipitation_sum || [];
+        const hours = historicalData.daily.precipitation_hours || [];
+        
+        return dates.map((date: string, index: number) => ({
+          date,
+          amount: Math.max(0, precip[index] || 0), // Ensure non-negative
+          hours: hours[index] || 0,
+          intensity: precip[index] > 0 ? (precip[index] / Math.max(1, hours[index] || 1)) : 0,
+          anomaly: precip[index] > climate.precipitation.historical_average * 1.5
+        })).filter((item: any) => item.amount >= 0);
+      };
+
       // Transform data to match expected format for DataPanel
       const transformedData = {
         location: name || `${latitude.toFixed(2)}, ${longitude.toFixed(2)}`,
@@ -58,24 +92,17 @@ const Index = () => {
         temperature: {
           current: climate.temperature.current,
           trend: climate.temperature.anomaly,
-          data: [
-            { date: '2020', value: climate.temperature.current - 2 },
-            { date: '2021', value: climate.temperature.current - 1.5 },
-            { date: '2022', value: climate.temperature.current - 1 },
-            { date: '2023', value: climate.temperature.current - 0.5 },
-            { date: '2024', value: climate.temperature.current, anomaly: Math.abs(climate.temperature.anomaly) > 1 },
-          ]
+          unit: climate.temperature.unit,
+          anomaly: climate.temperature.anomaly,
+          data: transformTemperatureData(climate.historicalData?.recent || null)
         },
         precipitation: {
           current: climate.precipitation.current,
           trend: climate.precipitation.current > climate.precipitation.historical_average ? 1 : -1,
-          data: [
-            { date: '2020', value: climate.precipitation.historical_average + 50 },
-            { date: '2021', value: climate.precipitation.historical_average + 20 },
-            { date: '2022', value: climate.precipitation.historical_average },
-            { date: '2023', value: climate.precipitation.historical_average - 20 },
-            { date: '2024', value: climate.precipitation.current },
-          ]
+          unit: climate.precipitation.unit,
+          cumulative: climate.precipitation.cumulative || { last24h: 0, last7days: 0, last30days: 0 },
+          historicalAverage: climate.precipitation.historical_average,
+          data: transformPrecipitationData(climate.historicalData?.recent || null)
         },
         airQuality: {
           index: airQuality.aqi.value,

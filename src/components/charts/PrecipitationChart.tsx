@@ -15,18 +15,24 @@ interface PrecipitationData {
 
 interface PrecipitationChartProps {
   data: PrecipitationData[];
-  current: number;
+  currentPrecip: number;
   unit: string;
   trend: number;
   historicalAverage?: number;
+  cumulative?: {
+    last24h: number;
+    last7days: number;
+    last30days: number;
+  };
 }
 
 const PrecipitationChart: React.FC<PrecipitationChartProps> = ({ 
   data, 
-  current, 
+  currentPrecip, 
   unit, 
   trend,
-  historicalAverage = 0
+  historicalAverage = 0,
+  cumulative
 }) => {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d' | '1y'>('30d');
   
@@ -107,12 +113,21 @@ const PrecipitationChart: React.FC<PrecipitationChartProps> = ({
           <Droplets className="w-5 h-5 text-primary" />
           Precipitation Analysis
         </CardTitle>
-        <CardDescription className="flex items-center justify-between">
-          <span>Current: {current}{unit} | Trend: {trend > 0 ? '+' : ''}{trend.toFixed(1)}%/decade</span>
-          {historicalAverage > 0 && (
-            <span className="text-xs text-muted-foreground">
-              Historical avg: {historicalAverage.toFixed(1)}{unit}
-            </span>
+        <CardDescription className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span>Current: {currentPrecip}{unit} | Trend: {trend > 0 ? '+' : ''}{trend.toFixed(1)}%/decade</span>
+            {historicalAverage > 0 && (
+              <span className="text-xs text-muted-foreground">
+                Historical avg: {historicalAverage.toFixed(1)}{unit}
+              </span>
+            )}
+          </div>
+          {cumulative && (
+            <div className="flex gap-4 text-xs">
+              <span>24h: {cumulative.last24h.toFixed(1)}{unit}</span>
+              <span>7d: {cumulative.last7days.toFixed(1)}{unit}</span>
+              <span>30d: {cumulative.last30days.toFixed(1)}{unit}</span>
+            </div>
           )}
         </CardDescription>
       </CardHeader>
