@@ -159,7 +159,7 @@ const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
               {data.temperature.data.slice(-3).map((item, index) => (
                 <div key={index} className="p-2 bg-card rounded border">
                   <div className="text-xs text-muted-foreground mb-1">{item.date}</div>
-                  <div className="text-sm font-mono">{item.value}°C</div>
+                  <div className="text-sm font-mono">{item.value !== undefined ? `${item.value}°C` : 'N/A'}</div>
                   {item.anomaly && (
                     <div className="w-2 h-2 bg-destructive rounded-full mx-auto mt-1"></div>
                   )}
