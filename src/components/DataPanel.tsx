@@ -1,8 +1,9 @@
 import React from 'react';
-import { TrendingUp, Thermometer, Droplets, Wind, AlertTriangle } from 'lucide-react';
+import { TrendingUp, Thermometer, Droplets, Wind, AlertTriangle, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-// Simple chart components using basic SVG
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ClimateChartsContainer from './charts/ClimateChartsContainer';
 
 interface ClimateData {
   location: string;
@@ -121,6 +122,18 @@ const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
           </div>
         )}
       </div>
+
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4" />
+            Analytics
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="overview" className="space-y-4 mt-4">
 
       {/* Temperature Card */}
       <Card className="bg-card/50 backdrop-blur-sm border-border/50">
@@ -274,6 +287,12 @@ const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+        
+        <TabsContent value="analytics" className="mt-4">
+          <ClimateChartsContainer data={data} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
