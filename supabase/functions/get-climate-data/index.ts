@@ -15,9 +15,11 @@ serve(async (req) => {
     const { latitude, longitude, startDate, endDate } = await req.json();
     
     console.log(`Fetching climate data for lat: ${latitude}, lng: ${longitude}`);
+    console.log(`Request timestamp: ${new Date().toISOString()}`);
 
     // Current weather data from Open-Meteo forecast API (real-time data)
-    const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,surface_pressure,weather_code&timezone=auto`;
+    // Add cache-busting parameter to ensure fresh data
+    const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m,relative_humidity_2m,surface_pressure,weather_code&timezone=auto&_t=${Date.now()}`;
     
     // Historical climate data (last 30 years using archive API)
     const historicalUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=1993-01-01&end_date=2022-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
@@ -26,7 +28,12 @@ serve(async (req) => {
     console.log('Fetching historical data from:', historicalUrl);
 
     const [currentResponse, historicalResponse] = await Promise.all([
-      fetch(currentWeatherUrl).catch(err => {
+      fetch(currentWeatherUrl, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      }).catch(err => {
         console.error('Current weather fetch failed:', err);
         return { ok: false, status: 500, statusText: 'Network error' };
       }),
@@ -48,13 +55,26 @@ serve(async (req) => {
 
     const currentData = await currentResponse.json();
     console.log('Current weather data received:', Object.keys(currentData));
+    console.log('API URL called:', currentWeatherUrl);
     console.log('Raw current weather values:', {
       temperature: currentData.current.temperature_2m,
       windSpeed: currentData.current.wind_speed_10m,
       windDirection: currentData.current.wind_direction_10m,
       precipitation: currentData.current.precipitation,
-      timestamp: currentData.current.time
+      timestamp: currentData.current.time,
+      currentTimeActual: new Date().toISOString()
     });
+
+    // Validate that we're getting current data (within last 3 hours)
+    const dataTimestamp = new Date(currentData.current.time);
+    const now = new Date();
+    const hoursDiff = (now.getTime() - dataTimestamp.getTime()) / (1000 * 60 * 60);
+    
+    if (hoursDiff > 3) {
+      console.warn(`Weather data is ${hoursDiff.toFixed(1)} hours old. Expected current data.`);
+    } else {
+      console.log(`Weather data is fresh: ${hoursDiff.toFixed(1)} hours old`);
+    }
 
     let historicalData = null;
     let tempAnomaly = 0;
