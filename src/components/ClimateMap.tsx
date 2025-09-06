@@ -77,55 +77,36 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
         minZoom={2}
         worldCopyJump={true}
       >
-        <LayersControl position="topright">
-          {/* Base layers */}
-          <LayersControl.BaseLayer checked name="OpenStreetMap">
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            />
-          </LayersControl.BaseLayer>
-          
-          <LayersControl.BaseLayer name="Satellite">
-            <TileLayer
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-              attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
-            />
-          </LayersControl.BaseLayer>
-          
-          <LayersControl.BaseLayer name="Terrain">
-            <TileLayer
-              url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://opentopomap.org/">OpenTopoMap</a> contributors'
-              maxZoom={17}
-            />
-          </LayersControl.BaseLayer>
+        {/* Base layers */}
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
 
-          {/* Climate overlay layers */}
-          <LayersControl.Overlay name="Temperature Data">
-            <TileLayer
-              url="https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo"
-              attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
-              opacity={0.6}
-            />
-          </LayersControl.Overlay>
-          
-          <LayersControl.Overlay name="Precipitation">
-            <TileLayer
-              url="https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo"
-              attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
-              opacity={0.6}
-            />
-          </LayersControl.Overlay>
-          
-          <LayersControl.Overlay name="Wind Speed">
-            <TileLayer
-              url="https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo"
-              attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
-              opacity={0.6}
-            />
-          </LayersControl.Overlay>
-        </LayersControl>
+        {/* Climate overlay layers - conditionally rendered */}
+        {selectedLayers.temperature && (
+          <TileLayer
+            url="https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo"
+            attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
+            opacity={0.6}
+          />
+        )}
+        
+        {selectedLayers.precipitation && (
+          <TileLayer
+            url="https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo"
+            attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
+            opacity={0.6}
+          />
+        )}
+        
+        {selectedLayers.airQuality && (
+          <TileLayer
+            url="https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo"
+            attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
+            opacity={0.6}
+          />
+        )}
 
         {/* Custom map click handler */}
         <MapClickHandler onLocationSelect={onLocationSelect} />
