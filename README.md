@@ -1,73 +1,65 @@
-# Welcome to your Lovable project
+# Climate Intelligence Platform
 
-## Project info
+Advanced climate data visualization and analysis platform powered by AI. Explore real-time weather patterns, environmental data, and climate trends through interactive maps and intelligent analytics.
 
-**URL**: https://lovable.dev/projects/68e7c145-b6ea-4301-9bc8-37833a671a6b
+## Features
 
-## How can I edit this code?
+- **Interactive Climate Maps**: Real-time weather data visualization with multiple climate layers
+- **AI-Powered Analysis**: Ask questions about climate data in multiple languages using Google Gemini AI
+- **Multi-language Support**: Get climate insights in 12+ languages including English, Spanish, French, German, Chinese, Japanese, and more
+- **Real-time Data**: Live weather stations, satellite data, and forecast models
+- **Advanced Analytics**: Temperature trends, precipitation patterns, air quality monitoring
+- **Climate Anomaly Detection**: Identify unusual weather patterns and climate events
 
-There are several ways of editing your application.
+## Technologies Used
 
-**Use Lovable**
+- **Frontend**: React, TypeScript, Tailwind CSS
+- **Maps**: Leaflet with climate data overlays
+- **Charts**: Recharts for data visualization
+- **AI Integration**: Google Gemini API for intelligent climate analysis
+- **Backend**: Supabase Edge Functions
+- **UI Components**: shadcn/ui component library
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/68e7c145-b6ea-4301-9bc8-37833a671a6b) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
+- Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+### Installation
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
+# Navigate to the project directory
 cd <YOUR_PROJECT_NAME>
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Usage
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. **Explore Climate Data**: Click on any location on the interactive map to view detailed climate information
+2. **Ask Questions**: Use the AI chat feature to ask questions about climate patterns and data in your preferred language
+3. **Analyze Trends**: View temperature, precipitation, and air quality trends through interactive charts
+4. **Monitor Anomalies**: Check for unusual climate patterns and environmental alerts
 
-**Use GitHub Codespaces**
+## AI Assistant
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+The platform includes an intelligent climate assistant powered by Google Gemini that can:
+- Answer questions about climate data and weather patterns
+- Provide insights in 12+ languages
+- Explain complex meteorological phenomena
+- Offer forecasting analysis and trend interpretation
 
-## What technologies are used for this project?
+## Contributing
 
-This project is built with:
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## License
 
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/68e7c145-b6ea-4301-9bc8-37833a671a6b) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is licensed under the MIT License.

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import ClimateMap from '@/components/ClimateMap';
 import LocationSearch from '@/components/LocationSearch';
-import DataPanel from '@/components/DataPanel';
+import { DataPanel } from '@/components/DataPanel';
 import { Card } from '@/components/ui/card';
 import { Globe, Thermometer, Droplets, Wind } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';

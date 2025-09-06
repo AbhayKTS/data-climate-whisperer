@@ -18,18 +18,29 @@ interface ClimateData {
   precipitation: {
     current: number;
     trend: number;
+    cumulative?: {
+      last24h: number;
+      last7days: number;
+      last30days: number;
+    };
     data: Array<{ date: string; amount?: number; value?: number; intensity?: string; anomaly?: boolean; historical?: number; hours?: number }>;
   };
   airQuality: {
     index: number;
+    aqi?: number;
     level: 'good' | 'moderate' | 'poor' | 'unhealthy';
-    pollutants: Array<{ name: string; value: number; unit: string }>;
+    pollutants: Array<{ name: string; value: number; unit: string }> | {
+      pm25: number;
+      pm10: number;
+      o3: number;
+      no2: number;
+    };
   };
   anomalies: Array<{
-    type: 'temperature' | 'precipitation' | 'air-quality';
+    type: 'temperature' | 'precipitation' | 'air-quality' | string;
     description: string;
     severity: 'low' | 'medium' | 'high';
-    date: string;
+    date?: string;
   }>;
   aiSummary?: string;
   rawData?: any;
@@ -176,7 +187,18 @@ const ClimateChartsContainer: React.FC<ClimateChartsContainerProps> = ({ data })
         <TabsContent value="air-quality" className="mt-6">
           <AirQualityChart
             data={airQualityData}
-            current={data.airQuality}
+            current={{
+              index: data.airQuality.aqi || data.airQuality.index,
+              level: data.airQuality.level,
+              pollutants: Array.isArray(data.airQuality.pollutants) 
+                ? data.airQuality.pollutants 
+                : [
+                    { name: 'PM2.5', value: data.airQuality.pollutants.pm25, unit: 'μg/m³' },
+                    { name: 'PM10', value: data.airQuality.pollutants.pm10, unit: 'μg/m³' },
+                    { name: 'O₃', value: data.airQuality.pollutants.o3, unit: 'μg/m³' },
+                    { name: 'NO₂', value: data.airQuality.pollutants.no2, unit: 'μg/m³' }
+                  ]
+            }}
           />
         </TabsContent>
       </Tabs>
