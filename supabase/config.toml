@@ -1,1 +1,13 @@
 project_id = "etsfhzicrwuimtgtstcj"
+
+[functions.get-climate-data]
+verify_jwt = false
+
+[functions.get-air-quality]
+verify_jwt = false
+
+[functions.geocode-location]
+verify_jwt = false
+
+[functions.generate-summary]
+verify_jwt = false

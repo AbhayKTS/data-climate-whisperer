@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Search, MapPin, Globe, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LocationResult {
   id: string;
@@ -27,38 +28,18 @@ const LocationSearch: React.FC<LocationSearchProps> = ({
   const debounceRef = useRef<NodeJS.Timeout>();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Search using Nominatim (OpenStreetMap's geocoding service)
+  // Search using Supabase edge function for geocoding
   const searchLocations = useCallback(async (searchQuery: string): Promise<LocationResult[]> => {
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?` +
-        new URLSearchParams({
-          q: searchQuery,
-          format: 'json',
-          limit: '10',
-          addressdetails: '1',
-          countrycodes: '', // Add country codes if needed
-        })
-      );
-      
-      if (!response.ok) {
-        throw new Error('Geocoding request failed');
+      const { data, error } = await supabase.functions.invoke('geocode-location', {
+        body: { query: searchQuery }
+      });
+
+      if (error) {
+        throw error;
       }
-      
-      const data = await response.json();
-      
-      const results: LocationResult[] = data.map((item: any) => ({
-        id: item.place_id.toString(),
-        name: item.display_name.split(',')[0], // Get main location name
-        coordinates: { 
-          lat: parseFloat(item.lat), 
-          lng: parseFloat(item.lon) 
-        },
-        type: item.type || 'place',
-        country: item.address?.country || undefined
-      }));
-      
-      return results;
+
+      return data || [];
     } catch (error) {
       console.error('Error searching locations:', error);
       
