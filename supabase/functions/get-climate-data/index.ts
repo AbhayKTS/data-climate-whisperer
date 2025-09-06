@@ -31,7 +31,8 @@ serve(async (req) => {
     const longTermUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=1993-01-01&end_date=2022-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
 
     console.log('Fetching current weather from:', currentWeatherUrl);
-    console.log('Fetching historical data from:', historicalUrl);
+    console.log('Fetching recent historical data from:', recentHistoricalUrl);
+    console.log('Fetching long-term data from:', longTermUrl);
 
     const [currentResponse, recentHistoricalResponse, longTermResponse] = await Promise.all([
       fetch(currentWeatherUrl, {
