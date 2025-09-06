@@ -17,9 +17,9 @@ serve(async (req) => {
     console.log(`Fetching climate data for lat: ${latitude}, lng: ${longitude}`);
     console.log(`Request timestamp: ${new Date().toISOString()}`);
 
-    // Use Open-Meteo's current weather endpoint for real observations
+    // Use Open-Meteo's forecast endpoint with current parameter for real observations
     // This provides actual weather station data, not forecast models
-    const currentWeatherUrl = `https://api.open-meteo.com/v1/current?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m&timezone=UTC&_t=${Date.now()}`;
+    const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m&timezone=UTC&_t=${Date.now()}`;
     
     // Historical climate data (last 30 years using archive API)
     const historicalUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=1993-01-01&end_date=2022-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
