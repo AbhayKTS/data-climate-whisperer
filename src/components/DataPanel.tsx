@@ -113,14 +113,6 @@ const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
         {/* Data Source Information */}
         {data.dataSource && (
           <div className="mt-2 flex items-center gap-2 text-xs">
-            <Badge variant="outline" className={`
-              ${data.dataFreshness === 'fresh' ? 'bg-green-500/10 text-green-600 border-green-500/20' : ''}
-              ${data.dataFreshness === 'delayed' ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20' : ''}
-              ${data.dataFreshness === 'forecast' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : ''}
-            `}>
-              {data.dataSource === 'weather_station' ? '🌡️ Live Station' : 
-               data.dataSource === 'forecast_model' ? '🔮 Forecast Model' : '📡 Satellite'}
-            </Badge>
             <span className="text-muted-foreground">
               • Updated: {data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : 'Unknown'}
             </span>
