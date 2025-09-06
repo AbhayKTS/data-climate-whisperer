@@ -195,8 +195,10 @@ const Index = () => {
               <div className="flex items-center space-x-2">
                 <Thermometer className="w-4 h-4 text-temperature-warm" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Global Avg</p>
-                  <p className="text-sm font-semibold">+1.2°C</p>
+                  <p className="text-xs text-muted-foreground">Temperature</p>
+                  <p className="text-sm font-semibold">
+                    {climateData?.temperature?.current ? `${climateData.temperature.current}°C` : '--°C'}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -204,8 +206,10 @@ const Index = () => {
               <div className="flex items-center space-x-2">
                 <Droplets className="w-4 h-4 text-primary" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Rainfall</p>
-                  <p className="text-sm font-semibold">-3.2%</p>
+                  <p className="text-xs text-muted-foreground">Precipitation</p>
+                  <p className="text-sm font-semibold">
+                    {climateData?.precipitation?.current !== undefined ? `${climateData.precipitation.current}mm` : '--mm'}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -214,7 +218,9 @@ const Index = () => {
                 <Wind className="w-4 h-4 text-accent" />
                 <div>
                   <p className="text-xs text-muted-foreground">Air Quality</p>
-                  <p className="text-sm font-semibold">Moderate</p>
+                  <p className="text-sm font-semibold">
+                    {climateData?.airQuality?.level ? climateData.airQuality.level.charAt(0).toUpperCase() + climateData.airQuality.level.slice(1) : 'Loading...'}
+                  </p>
                 </div>
               </div>
             </Card>
