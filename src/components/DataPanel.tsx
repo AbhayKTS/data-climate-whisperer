@@ -147,22 +147,28 @@ const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-32 flex items-end space-x-1">
-            {data.temperature.data.map((item, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center space-y-1">
-                <div 
-                  className={`w-full rounded-t transition-all duration-300 ${
-                    item.anomaly ? 'bg-destructive' : 'bg-temperature-warm'
-                  }`}
-                  style={{ 
-                    height: `${((item.value - 20) / 5) * 100}%`,
-                    minHeight: '4px'
-                  }}
-                />
-                <div className="text-xs text-muted-foreground">{item.date}</div>
-                <div className="text-xs font-mono">{item.value}°</div>
+          <div className="space-y-3">
+            {/* Current Temperature Display */}
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-temperature-warm"></div>
+                <span className="text-sm">Current</span>
               </div>
-            ))}
+              <span className="text-lg font-bold">{data.temperature.current}°C</span>
+            </div>
+            
+            {/* Temperature Trend */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              {data.temperature.data.slice(-3).map((item, index) => (
+                <div key={index} className="p-2 bg-card rounded border">
+                  <div className="text-xs text-muted-foreground mb-1">{item.date}</div>
+                  <div className="text-sm font-mono">{item.value}°C</div>
+                  {item.anomaly && (
+                    <div className="w-2 h-2 bg-destructive rounded-full mx-auto mt-1"></div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
