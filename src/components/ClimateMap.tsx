@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { MapContainer } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import MapErrorBoundary from './MapErrorBoundary';
-import ClimateMapCore from './ClimateMapCore';
 
 // Fix for default markers in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -18,22 +16,148 @@ interface ClimateMapProps {
   selectedLocation?: { lat: number; lng: number } | null;
 }
 
+// Custom climate marker icon
+const createClimateIcon = () => {
+  return L.divIcon({
+    className: 'custom-climate-marker',
+    html: `
+      <div style="
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, hsl(205, 80%, 35%), hsl(205, 90%, 55%));
+        border: 3px solid rgba(255, 255, 255, 0.8);
+        border-radius: 50%;
+        box-shadow: 0 4px 15px hsl(205 80% 35% / 0.4);
+        animation: pulse 2s infinite;
+      "></div>
+    `,
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+};
+
 const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocation }) => {
+  const [map, setMap] = useState<L.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [selectedLayers, setSelectedLayers] = useState({
     temperature: false,
     precipitation: false,
     airQuality: false,
   });
+  const [climateLayers, setClimateLayers] = useState<{
+    temperature?: L.TileLayer;
+    precipitation?: L.TileLayer;
+    airQuality?: L.TileLayer;
+  }>({});
+  const [marker, setMarker] = useState<L.Marker | null>(null);
 
+  // Initialize map
   useEffect(() => {
-    // Add a small delay to ensure proper initialization
-    const timer = setTimeout(() => {
-      setIsMapLoaded(true);
-    }, 100);
+    const mapContainer = document.getElementById('map-container');
+    if (!mapContainer || map) return;
 
-    return () => clearTimeout(timer);
-  }, []);
+    try {
+      const leafletMap = L.map('map-container', {
+        center: [30, 20],
+        zoom: 2,
+        maxZoom: 18,
+        minZoom: 2,
+        worldCopyJump: true,
+      });
+
+      // Add base tile layer
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(leafletMap);
+
+      // Add click handler
+      leafletMap.on('click', (e) => {
+        const { lat, lng } = e.latlng;
+        onLocationSelect?.({ lat, lng });
+      });
+
+      setMap(leafletMap);
+      setIsMapLoaded(true);
+
+      return () => {
+        leafletMap.remove();
+      };
+    } catch (error) {
+      console.error('Error initializing map:', error);
+    }
+  }, [onLocationSelect]);
+
+  // Handle layer changes
+  useEffect(() => {
+    if (!map) return;
+
+    // Temperature layer
+    if (selectedLayers.temperature && !climateLayers.temperature) {
+      const tempLayer = L.tileLayer('https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo', {
+        attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+        opacity: 0.6
+      });
+      tempLayer.addTo(map);
+      setClimateLayers(prev => ({ ...prev, temperature: tempLayer }));
+    } else if (!selectedLayers.temperature && climateLayers.temperature) {
+      map.removeLayer(climateLayers.temperature);
+      setClimateLayers(prev => ({ ...prev, temperature: undefined }));
+    }
+
+    // Precipitation layer
+    if (selectedLayers.precipitation && !climateLayers.precipitation) {
+      const precipLayer = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo', {
+        attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+        opacity: 0.6
+      });
+      precipLayer.addTo(map);
+      setClimateLayers(prev => ({ ...prev, precipitation: precipLayer }));
+    } else if (!selectedLayers.precipitation && climateLayers.precipitation) {
+      map.removeLayer(climateLayers.precipitation);
+      setClimateLayers(prev => ({ ...prev, precipitation: undefined }));
+    }
+
+    // Air quality layer
+    if (selectedLayers.airQuality && !climateLayers.airQuality) {
+      const airLayer = L.tileLayer('https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo', {
+        attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
+        opacity: 0.6
+      });
+      airLayer.addTo(map);
+      setClimateLayers(prev => ({ ...prev, airQuality: airLayer }));
+    } else if (!selectedLayers.airQuality && climateLayers.airQuality) {
+      map.removeLayer(climateLayers.airQuality);
+      setClimateLayers(prev => ({ ...prev, airQuality: undefined }));
+    }
+  }, [map, selectedLayers, climateLayers]);
+
+  // Handle selected location marker
+  useEffect(() => {
+    if (!map) return;
+
+    // Remove existing marker
+    if (marker) {
+      map.removeLayer(marker);
+      setMarker(null);
+    }
+
+    // Add new marker if location selected
+    if (selectedLocation) {
+      const newMarker = L.marker([selectedLocation.lat, selectedLocation.lng], {
+        icon: createClimateIcon()
+      }).addTo(map);
+
+      newMarker.bindPopup(`
+        <div style="font-size: 12px;">
+          <strong>Selected Location</strong><br />
+          Lat: ${selectedLocation.lat.toFixed(4)}<br />
+          Lng: ${selectedLocation.lng.toFixed(4)}
+        </div>
+      `);
+
+      setMarker(newMarker);
+    }
+  }, [map, selectedLocation, marker]);
 
   const handleLayerChange = useCallback((layerName: keyof typeof selectedLayers) => {
     setSelectedLayers(prev => ({
@@ -42,32 +166,13 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
     }));
   }, []);
 
-  const handleLocationSelect = useCallback((coordinates: { lat: number; lng: number }) => {
-    onLocationSelect?.(coordinates);
-  }, [onLocationSelect]);
-
-  // Memoize map container props to prevent unnecessary re-renders
-  const mapProps = useMemo(() => ({
-    center: [30, 20] as [number, number],
-    zoom: 2,
-    className: "absolute inset-0 rounded-lg overflow-hidden z-0",
-    maxZoom: 18,
-    minZoom: 2,
-    worldCopyJump: true,
-  }), []);
-
   return (
     <div className="relative w-full h-full">
       <MapErrorBoundary>
-        {isMapLoaded && (
-          <MapContainer {...mapProps}>
-            <ClimateMapCore
-              onLocationSelect={handleLocationSelect}
-              selectedLocation={selectedLocation}
-              selectedLayers={selectedLayers}
-            />
-          </MapContainer>
-        )}
+        <div
+          id="map-container"
+          className="absolute inset-0 rounded-lg overflow-hidden z-0"
+        />
       </MapErrorBoundary>
 
       {/* Climate data overlay controls */}
