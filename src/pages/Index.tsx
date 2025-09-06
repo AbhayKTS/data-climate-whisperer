@@ -97,9 +97,9 @@ const Index = () => {
          ],
         currentWeather: {
           temperature: climate.temperature.current,
-          windSpeed: climate.wind_speed || 0,
+          windSpeed: climate.wind?.speed || 0,
           precipitation: climate.precipitation.current,
-          windDirection: climate.wind_direction || 0
+          windDirection: climate.wind?.direction || 0
         },
         rawData: { climate, airQuality }
       };
