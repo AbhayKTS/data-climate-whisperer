@@ -80,10 +80,11 @@ const Index = () => {
         // Use live hourly precipitation data
         if (climate.liveData?.precipitation && climate.liveData.precipitation.length > 0) {
           console.log(`Using ${climate.liveData.precipitation.length} live precipitation data points`);
+          console.log('Sample precipitation data:', climate.liveData.precipitation[0]);
           return climate.liveData.precipitation.map((item: any) => ({
-            date: new Date(item.date).toLocaleDateString() + ' ' + item.time,
-            precipitation: item.precipitation,
-            intensity: item.intensity,
+            date: item.date.includes('T') ? item.date : new Date(item.date).toLocaleDateString() + ' ' + (item.time || ''),
+            precipitation: Number(item.precipitation) || 0,
+            intensity: item.intensity || (item.precipitation > 10 ? 'heavy' : item.precipitation > 2.5 ? 'moderate' : item.precipitation > 0.1 ? 'light' : 'none'),
             isLive: true
           }));
         } else if (climate.historicalData?.recent?.daily) {
@@ -119,7 +120,11 @@ const Index = () => {
           current: climate.precipitation.current,
           trend: climate.precipitation.current > climate.precipitation.historical_average ? 1 : -1,
           unit: climate.precipitation.unit,
-          cumulative: climate.precipitation.cumulative || { last24h: 0, last7days: 0, last30days: 0 },
+          cumulative: {
+            last24h: climate.precipitation.cumulative?.last24h || 0,
+            last7days: climate.precipitation.cumulative?.last7days || 0, 
+            last30days: climate.precipitation.cumulative?.last30days || 0
+          },
           historicalAverage: climate.precipitation.historical_average,
           data: transformPrecipitationData()
         },
