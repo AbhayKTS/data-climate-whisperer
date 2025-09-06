@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, LayersControl } from 'react-leaflet';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { MapContainer } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import MapErrorBoundary from './MapErrorBoundary';
+import ClimateMapCore from './ClimateMapCore';
 
 // Fix for default markers in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -16,37 +18,6 @@ interface ClimateMapProps {
   selectedLocation?: { lat: number; lng: number } | null;
 }
 
-// Custom climate marker icon
-const createClimateIcon = () => {
-  return L.divIcon({
-    className: 'custom-climate-marker',
-    html: `
-      <div style="
-        width: 24px;
-        height: 24px;
-        background: linear-gradient(135deg, #0ea5e9, #06b6d4);
-        border: 3px solid rgba(255, 255, 255, 0.8);
-        border-radius: 50%;
-        box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
-        animation: pulse 2s infinite;
-      "></div>
-    `,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-  });
-};
-
-// Map click handler component
-const MapClickHandler: React.FC<{ onLocationSelect?: (coordinates: { lat: number; lng: number }) => void }> = ({ onLocationSelect }) => {
-  useMapEvents({
-    click: (e) => {
-      const { lat, lng } = e.latlng;
-      onLocationSelect?.({ lat, lng });
-    },
-  });
-  return null;
-};
-
 const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocation }) => {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [selectedLayers, setSelectedLayers] = useState({
@@ -56,77 +27,48 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
   });
 
   useEffect(() => {
-    // Map is loaded when component mounts
-    setIsMapLoaded(true);
+    // Add a small delay to ensure proper initialization
+    const timer = setTimeout(() => {
+      setIsMapLoaded(true);
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, []);
 
-  const handleLayerChange = (layerName: keyof typeof selectedLayers) => {
+  const handleLayerChange = useCallback((layerName: keyof typeof selectedLayers) => {
     setSelectedLayers(prev => ({
       ...prev,
       [layerName]: !prev[layerName]
     }));
-  };
+  }, []);
+
+  const handleLocationSelect = useCallback((coordinates: { lat: number; lng: number }) => {
+    onLocationSelect?.(coordinates);
+  }, [onLocationSelect]);
+
+  // Memoize map container props to prevent unnecessary re-renders
+  const mapProps = useMemo(() => ({
+    center: [30, 20] as [number, number],
+    zoom: 2,
+    className: "absolute inset-0 rounded-lg overflow-hidden z-0",
+    maxZoom: 18,
+    minZoom: 2,
+    worldCopyJump: true,
+  }), []);
 
   return (
     <div className="relative w-full h-full">
-      <MapContainer
-        center={[30, 20]}
-        zoom={2}
-        className="absolute inset-0 rounded-lg overflow-hidden z-0"
-        maxZoom={18}
-        minZoom={2}
-        worldCopyJump={true}
-      >
-        {/* Base layers */}
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-
-        {/* Climate overlay layers - conditionally rendered */}
-        {selectedLayers.temperature && (
-          <TileLayer
-            url="https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo"
-            attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
-            opacity={0.6}
-          />
+      <MapErrorBoundary>
+        {isMapLoaded && (
+          <MapContainer {...mapProps}>
+            <ClimateMapCore
+              onLocationSelect={handleLocationSelect}
+              selectedLocation={selectedLocation}
+              selectedLayers={selectedLayers}
+            />
+          </MapContainer>
         )}
-        
-        {selectedLayers.precipitation && (
-          <TileLayer
-            url="https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo"
-            attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
-            opacity={0.6}
-          />
-        )}
-        
-        {selectedLayers.airQuality && (
-          <TileLayer
-            url="https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo"
-            attribution='&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>'
-            opacity={0.6}
-          />
-        )}
-
-        {/* Custom map click handler */}
-        <MapClickHandler onLocationSelect={onLocationSelect} />
-
-        {/* Selected location marker */}
-        {selectedLocation && (
-          <Marker 
-            position={[selectedLocation.lat, selectedLocation.lng]} 
-            icon={createClimateIcon()}
-          >
-            <Popup>
-              <div className="text-sm">
-                <strong>Selected Location</strong><br />
-                Lat: {selectedLocation.lat.toFixed(4)}<br />
-                Lng: {selectedLocation.lng.toFixed(4)}
-              </div>
-            </Popup>
-          </Marker>
-        )}
-      </MapContainer>
+      </MapErrorBoundary>
 
       {/* Climate data overlay controls */}
       <div className="absolute top-4 left-4 z-10 space-y-2">
