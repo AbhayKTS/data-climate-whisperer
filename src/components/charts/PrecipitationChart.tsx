@@ -8,9 +8,11 @@ import { Droplets, Cloud, Zap } from 'lucide-react';
 interface PrecipitationData {
   date: string;
   precipitation: number;
-  intensity?: 'light' | 'moderate' | 'heavy' | 'extreme';
+  intensity?: 'light' | 'moderate' | 'heavy' | 'extreme' | 'none';
   anomaly?: boolean;
   historical?: number;
+  isLive?: boolean;
+  time?: string;
 }
 
 interface PrecipitationChartProps {
@@ -111,11 +113,14 @@ const PrecipitationChart: React.FC<PrecipitationChartProps> = ({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Droplets className="w-5 h-5 text-primary" />
-          Precipitation Analysis
+          Live Precipitation Data
+          {data.some(d => d.isLive) && (
+            <span className="text-xs bg-blue-500/20 text-blue-500 px-2 py-1 rounded">LIVE</span>
+          )}
         </CardTitle>
         <CardDescription className="space-y-2">
           <div className="flex items-center justify-between">
-            <span>Current: {currentPrecip}{unit} | Trend: {trend > 0 ? '+' : ''}{trend.toFixed(1)}%/decade</span>
+            <span>Current: {currentPrecip}{unit}/h | {data.some(d => d.isLive) ? 'Real-time hourly data' : 'Historical daily data'}</span>
             {historicalAverage > 0 && (
               <span className="text-xs text-muted-foreground">
                 Historical avg: {historicalAverage.toFixed(1)}{unit}
@@ -123,22 +128,69 @@ const PrecipitationChart: React.FC<PrecipitationChartProps> = ({
             )}
           </div>
           {cumulative && (
-            <div className="flex gap-4 text-xs">
-              <span>24h: {cumulative.last24h.toFixed(1)}{unit}</span>
-              <span>7d: {cumulative.last7days.toFixed(1)}{unit}</span>
-              <span>30d: {cumulative.last30days.toFixed(1)}{unit}</span>
+            <div className="flex gap-4 text-xs font-medium">
+              <span className={cumulative.last24h > 25 ? 'text-red-500' : cumulative.last24h > 10 ? 'text-yellow-500' : 'text-foreground'}>
+                24h: {cumulative.last24h.toFixed(1)}{unit}
+              </span>
+              <span className={cumulative.last7days > 100 ? 'text-red-500' : cumulative.last7days > 50 ? 'text-yellow-500' : 'text-foreground'}>
+                7d: {cumulative.last7days.toFixed(1)}{unit}
+              </span>
+              <span className={cumulative.last30days > 200 ? 'text-red-500' : cumulative.last30days > 100 ? 'text-yellow-500' : 'text-foreground'}>
+                30d: {cumulative.last30days.toFixed(1)}{unit}
+              </span>
             </div>
           )}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="patterns" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="live" className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="live">Live Data</TabsTrigger>
             <TabsTrigger value="patterns">Patterns</TabsTrigger>
             <TabsTrigger value="intensity">Intensity</TabsTrigger>
             <TabsTrigger value="monthly">Monthly</TabsTrigger>
             <TabsTrigger value="frequency">Frequency</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="live" className="space-y-4">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={10}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                  />
+                  <Tooltip 
+                    formatter={formatTooltip}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="precipitation"
+                    stroke="hsl(var(--primary))"
+                    fill="hsl(var(--primary) / 0.3)"
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {data.some(d => d.isLive) ? 'Real-time precipitation measurements from the last 48 hours' : 'Recent precipitation data'}
+            </p>
+          </TabsContent>
           
           <TabsContent value="patterns" className="space-y-4">
             <div className="flex gap-2">

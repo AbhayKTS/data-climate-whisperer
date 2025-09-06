@@ -51,38 +51,57 @@ const Index = () => {
       const climate = climateResponse.data;
       const airQuality = airQualityResponse.data;
 
-      // Transform historical data to chart format
-      const transformTemperatureData = (historicalData: any) => {
-        if (!historicalData?.daily) return [];
-        
-        const dates = historicalData.daily.time || [];
-        const temps = historicalData.daily.temperature_2m_mean || [];
-        const minTemps = historicalData.daily.temperature_2m_min || [];
-        const maxTemps = historicalData.daily.temperature_2m_max || [];
-        
-        return dates.map((date: string, index: number) => ({
-          date,
-          temperature: temps[index] || null,
-          min: minTemps[index] || null,
-          max: maxTemps[index] || null,
-          historical: temps[index] || null
-        })).filter((item: any) => item.temperature !== null);
+      // Transform live and historical data for charts - prioritize real-time hourly data
+      const transformTemperatureData = () => {
+        // Use live hourly data if available (last 48 hours) - this is the main view
+        if (climate.liveData?.temperature && climate.liveData.temperature.length > 0) {
+          console.log(`Using ${climate.liveData.temperature.length} live temperature data points`);
+          return climate.liveData.temperature.map((item: any) => ({
+            date: new Date(item.date).toLocaleDateString() + ' ' + item.time,
+            temperature: item.temperature,
+            isLive: true
+          }));
+        } else if (climate.historicalData?.recent?.daily) {
+          // Fallback to daily historical data if hourly not available
+          const historicalData = climate.historicalData.recent;
+          const dates = historicalData.daily.time || [];
+          const temps = historicalData.daily.temperature_2m_mean || [];
+          
+          return dates.slice(-30).map((date: string, index: number) => ({
+            date: new Date(date).toLocaleDateString(),
+            temperature: temps[index] || 0,
+            isLive: false
+          }));
+        }
+        return [];
       };
 
-      const transformPrecipitationData = (historicalData: any) => {
-        if (!historicalData?.daily) return [];
-        
-        const dates = historicalData.daily.time || [];
-        const precip = historicalData.daily.precipitation_sum || [];
-        const hours = historicalData.daily.precipitation_hours || [];
-        
-        return dates.map((date: string, index: number) => ({
-          date,
-          amount: Math.max(0, precip[index] || 0), // Ensure non-negative
-          hours: hours[index] || 0,
-          intensity: precip[index] > 0 ? (precip[index] / Math.max(1, hours[index] || 1)) : 0,
-          anomaly: precip[index] > climate.precipitation.historical_average * 1.5
-        })).filter((item: any) => item.amount >= 0);
+      const transformPrecipitationData = () => {
+        // Use live hourly precipitation data
+        if (climate.liveData?.precipitation && climate.liveData.precipitation.length > 0) {
+          console.log(`Using ${climate.liveData.precipitation.length} live precipitation data points`);
+          return climate.liveData.precipitation.map((item: any) => ({
+            date: new Date(item.date).toLocaleDateString() + ' ' + item.time,
+            precipitation: item.precipitation,
+            intensity: item.intensity,
+            isLive: true
+          }));
+        } else if (climate.historicalData?.recent?.daily) {
+          // Fallback to daily historical data
+          const historicalData = climate.historicalData.recent;
+          const dates = historicalData.daily.time || [];
+          const precip = historicalData.daily.precipitation_sum || [];
+          
+          return dates.slice(-30).map((date: string, index: number) => ({
+            date: new Date(date).toLocaleDateString(),
+            precipitation: precip[index] || 0,
+            intensity: (precip[index] || 0) > 10 ? 'heavy' as const : 
+                      (precip[index] || 0) > 2.5 ? 'moderate' as const : 
+                      (precip[index] || 0) > 0 ? 'light' as const : 'light' as const,
+            isLive: false
+          }));
+        }
+        return [];
       };
 
       // Transform data to match expected format for DataPanel
@@ -94,7 +113,7 @@ const Index = () => {
           trend: climate.temperature.anomaly,
           unit: climate.temperature.unit,
           anomaly: climate.temperature.anomaly,
-          data: transformTemperatureData(climate.historicalData?.recent || null)
+          data: transformTemperatureData()
         },
         precipitation: {
           current: climate.precipitation.current,
@@ -102,7 +121,7 @@ const Index = () => {
           unit: climate.precipitation.unit,
           cumulative: climate.precipitation.cumulative || { last24h: 0, last7days: 0, last30days: 0 },
           historicalAverage: climate.precipitation.historical_average,
-          data: transformPrecipitationData(climate.historicalData?.recent || null)
+          data: transformPrecipitationData()
         },
         airQuality: {
           index: airQuality.aqi.value,
@@ -229,14 +248,17 @@ const Index = () => {
                 </div>
               </div>
             </Card>
-            <Card className="p-3 bg-primary/10 border-primary/20">
+            <Card className={`p-3 border ${climateData?.precipitation?.cumulative?.last24h > 25 ? 'bg-red-500/10 border-red-500/30' : climateData?.precipitation?.cumulative?.last24h > 10 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-primary/10 border-primary/20'}`}>
               <div className="flex items-center space-x-2">
-                <Droplets className="w-4 h-4 text-primary" />
+                <Droplets className={`w-4 h-4 ${climateData?.precipitation?.cumulative?.last24h > 25 ? 'text-red-500' : climateData?.precipitation?.cumulative?.last24h > 10 ? 'text-yellow-500' : 'text-primary'}`} />
                 <div>
-                  <p className="text-xs text-muted-foreground">Precipitation</p>
+                  <p className="text-xs text-muted-foreground">Precipitation (24h)</p>
                   <p className="text-sm font-semibold">
-                    {climateData?.precipitation?.current !== undefined ? `${climateData.precipitation.current}mm` : '--mm'}
+                    {climateData?.precipitation?.cumulative?.last24h !== undefined ? `${climateData.precipitation.cumulative.last24h.toFixed(1)}mm` : '--mm'}
                   </p>
+                  {climateData?.precipitation?.cumulative?.last24h > 25 && (
+                    <p className="text-xs text-red-500 font-medium">Flood Risk</p>
+                  )}
                 </div>
               </div>
             </Card>

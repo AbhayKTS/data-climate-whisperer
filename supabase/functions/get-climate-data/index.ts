@@ -17,17 +17,16 @@ serve(async (req) => {
     console.log(`Fetching climate data for lat: ${latitude}, lng: ${longitude}`);
     console.log(`Request timestamp: ${new Date().toISOString()}`);
 
-    // Use Open-Meteo's forecast endpoint with current parameter for real observations
-    // This provides actual weather station data, not forecast models
-    const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m&timezone=UTC&_t=${Date.now()}`;
+    // Get real-time current weather data with hourly forecast for recent data
+    const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,rain,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m&hourly=temperature_2m,precipitation,rain,relative_humidity_2m,wind_speed_10m&past_days=7&forecast_days=1&timezone=auto&_t=${Date.now()}`;
     
-    // Recent historical data (last 2 years for detailed charts) and long-term average
+    // Recent detailed hourly data for live charts (last 30 days)
     const recentDate = new Date();
-    recentDate.setFullYear(recentDate.getFullYear() - 2);
+    recentDate.setDate(recentDate.getDate() - 30);
     const recentStartDate = recentDate.toISOString().split('T')[0];
     const currentDate = new Date().toISOString().split('T')[0];
     
-    const recentHistoricalUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${recentStartDate}&end_date=${currentDate}&daily=temperature_2m_mean,temperature_2m_min,temperature_2m_max,precipitation_sum,precipitation_hours,wind_speed_10m_max,relative_humidity_2m_mean&timezone=auto`;
+    const recentHistoricalUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=${recentStartDate}&end_date=${currentDate}&hourly=temperature_2m,precipitation,relative_humidity_2m,wind_speed_10m&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
     const longTermUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=1993-01-01&end_date=2022-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
 
     console.log('Fetching current weather from:', currentWeatherUrl);
@@ -76,7 +75,8 @@ serve(async (req) => {
       windDirection: currentData.current.wind_direction_10m,
       precipitation: currentData.current.precipitation,
       timestamp: currentData.current.time,
-      currentTimeActual: new Date().toISOString()
+      currentTimeActual: new Date().toISOString(),
+      hourlyDataAvailable: currentData.hourly ? Object.keys(currentData.hourly) : 'none'
     });
 
     // Validate that we're getting current data (within last 30 minutes for real-time)
@@ -113,15 +113,57 @@ serve(async (req) => {
       last7days: 0,
       last30days: 0
     };
+    let recentHourlyData = [];
+    let liveTemperatureData = [];
+    let livePrecipitationData = [];
 
-    // Process recent historical data (for detailed charts)
+    // Process current weather data with recent hourly data for live charts
+    if (currentData.hourly && currentData.hourly.time) {
+      console.log('Processing hourly data for live charts');
+      const hourlyTimes = currentData.hourly.time || [];
+      const hourlyTemps = currentData.hourly.temperature_2m || [];
+      const hourlyPrecip = currentData.hourly.precipitation || [];
+      
+      // Create live data arrays with last 48 hours
+      const now = new Date();
+      for (let i = 0; i < hourlyTimes.length; i++) {
+        const hourDate = new Date(hourlyTimes[i]);
+        const hoursAgo = (now.getTime() - hourDate.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursAgo <= 48 && hoursAgo >= 0) { // Last 48 hours
+          liveTemperatureData.push({
+            date: hourlyTimes[i],
+            temperature: hourlyTemps[i] || 0,
+            time: hourDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+          });
+          
+          livePrecipitationData.push({
+            date: hourlyTimes[i],
+            precipitation: hourlyPrecip[i] || 0,
+            time: hourDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            intensity: hourlyPrecip[i] > 10 ? 'heavy' : hourlyPrecip[i] > 2.5 ? 'moderate' : hourlyPrecip[i] > 0.1 ? 'light' : 'none'
+          });
+          
+          // Calculate cumulative precipitation from hourly data
+          const hoursDiff = (now.getTime() - hourDate.getTime()) / (1000 * 60 * 60);
+          const precip = hourlyPrecip[i] || 0;
+          
+          if (hoursDiff <= 24) cumulativePrecipitation.last24h += precip;
+          if (hoursDiff <= 168) cumulativePrecipitation.last7days += precip; // 7 * 24 hours
+        }
+      }
+      
+      console.log(`Generated ${liveTemperatureData.length} live temperature points and ${livePrecipitationData.length} live precipitation points`);
+    }
+
+    // Process recent historical data (for context and 30-day accumulation)
     if (recentHistoricalResponse.ok) {
       try {
         recentHistoricalData = await recentHistoricalResponse.json();
         console.log('Recent historical data received:', Object.keys(recentHistoricalData));
         
         if (recentHistoricalData.daily) {
-          // Calculate cumulative precipitation
+          // Calculate 30-day cumulative precipitation from daily data
           const dates = recentHistoricalData.daily.time || [];
           const precipData = recentHistoricalData.daily.precipitation_sum || [];
           const now = new Date();
@@ -131,8 +173,6 @@ serve(async (req) => {
             const daysDiff = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
             const precip = precipData[i] || 0;
             
-            if (daysDiff <= 1) cumulativePrecipitation.last24h += precip;
-            if (daysDiff <= 7) cumulativePrecipitation.last7days += precip;
             if (daysDiff <= 30) cumulativePrecipitation.last30days += precip;
           }
         }
@@ -219,6 +259,10 @@ serve(async (req) => {
       historicalData: {
         recent: recentHistoricalData,
         longTerm: longTermData
+      },
+      liveData: {
+        temperature: liveTemperatureData,
+        precipitation: livePrecipitationData
       },
       dataSource: dataSource,
       dataFreshness: dataFreshness,

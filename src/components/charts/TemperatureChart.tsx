@@ -11,6 +11,8 @@ interface TemperatureData {
   anomaly?: boolean;
   historical?: number;
   trend?: number;
+  isLive?: boolean;
+  time?: string;
 }
 
 interface TemperatureChartProps {
@@ -71,10 +73,13 @@ const TemperatureChart: React.FC<TemperatureChartProps> = ({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <TrendingUp className="w-5 h-5 text-temperature-warm" />
-          Temperature Analysis
+          Live Temperature Data
+          {data.some(d => d.isLive) && (
+            <span className="text-xs bg-green-500/20 text-green-500 px-2 py-1 rounded">LIVE</span>
+          )}
         </CardTitle>
         <CardDescription className="flex items-center justify-between">
-          <span>Current: {current}{unit} | Trend: {trend > 0 ? '+' : ''}{trend.toFixed(2)}°C/decade</span>
+          <span>Current: {current}{unit} | {data.some(d => d.isLive) ? 'Real-time hourly data' : 'Historical daily data'}</span>
           {anomaly !== 0 && (
             <span className={`text-xs px-2 py-1 rounded ${anomaly > 0 ? 'bg-temperature-hot/20 text-temperature-hot' : 'bg-temperature-cool/20 text-temperature-cool'}`}>
               {anomaly > 0 ? '+' : ''}{anomaly.toFixed(1)}°C anomaly
@@ -83,12 +88,55 @@ const TemperatureChart: React.FC<TemperatureChartProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="trends" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="live" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="live">Live Data</TabsTrigger>
             <TabsTrigger value="trends">Trends</TabsTrigger>
             <TabsTrigger value="frequency">Frequency</TabsTrigger>
             <TabsTrigger value="changes">Changes</TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="live" className="space-y-4">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={10}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    domain={['dataMin - 2', 'dataMax + 2']}
+                  />
+                  <Tooltip 
+                    formatter={formatTooltip}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="temperature" 
+                    stroke="hsl(var(--temperature-warm))" 
+                    strokeWidth={3}
+                    dot={{ fill: 'hsl(var(--temperature-warm))', strokeWidth: 2, r: 3 }}
+                    activeDot={{ r: 6, stroke: 'hsl(var(--temperature-warm))' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {data.some(d => d.isLive) ? 'Real-time temperature readings from the last 48 hours' : 'Recent temperature data'}
+            </p>
+          </TabsContent>
           
           <TabsContent value="trends" className="space-y-4">
             <div className="flex gap-2">
