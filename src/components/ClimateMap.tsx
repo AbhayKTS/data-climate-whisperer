@@ -119,11 +119,11 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
       const currentWeather = climateData?.currentWeather;
       
       // Temperature layer with live data
-      if (layerType === 'temperature' && currentWeather?.temperature !== undefined && selectedLocation) {
+      if (layerType === 'temperature' && currentWeather?.temperature !== undefined) {
         const tileFunction = LIVE_CLIMATE_LAYERS.temperature.createTileFunction(
           currentWeather.temperature,
-          selectedLocation.lat,
-          selectedLocation.lng
+          selectedLocation?.lat || 0,
+          selectedLocation?.lng || 0
         );
         
         // Create custom tile layer that generates tiles dynamically
@@ -160,13 +160,13 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
       }
 
       // Wind layer with live data
-      if (layerType === 'wind' && currentWeather?.windSpeed !== undefined && selectedLocation) {
+      if (layerType === 'wind' && currentWeather?.windSpeed !== undefined) {
         const windDirection = currentWeather.windDirection || 0;
         const tileFunction = LIVE_CLIMATE_LAYERS.wind.createTileFunction(
           currentWeather.windSpeed,
           windDirection,
-          selectedLocation.lat,
-          selectedLocation.lng
+          selectedLocation?.lat || 0,
+          selectedLocation?.lng || 0
         );
         
         // Create custom tile layer for wind patterns
@@ -365,13 +365,13 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
               />
               <span className="flex items-center gap-1">
                 Temperature
-                {climateData?.currentWeather?.temperature !== undefined && selectedLocation ? (
+                {climateData?.currentWeather?.temperature !== undefined ? (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
                     Live {climateData.currentWeather.temperature.toFixed(1)}°C
                   </span>
                 ) : (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                    Demo
+                    Select Location
                   </span>
                 )}
                 {layerLoadingState.temperature && (
@@ -405,13 +405,13 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
               />
               <span className="flex items-center gap-1">
                 Wind Patterns
-                {climateData?.currentWeather?.windSpeed !== undefined && selectedLocation ? (
+                {climateData?.currentWeather?.windSpeed !== undefined ? (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200">
                     Live {climateData.currentWeather.windSpeed.toFixed(1)}m/s
                   </span>
                 ) : (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                    Demo
+                    Select Location
                   </span>
                 )}
                 {layerLoadingState.wind && (

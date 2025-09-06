@@ -94,7 +94,13 @@ const Index = () => {
             severity: Math.abs(climate.temperature.anomaly) > 2 ? 'high' : Math.abs(climate.temperature.anomaly) > 1 ? 'medium' : 'low' as const,
             date: new Date().toISOString().split('T')[0]
           }
-        ],
+         ],
+        currentWeather: {
+          temperature: climate.temperature.current,
+          windSpeed: climate.wind_speed || 0,
+          precipitation: climate.precipitation.current,
+          windDirection: climate.wind_direction || 0
+        },
         rawData: { climate, airQuality }
       };
 
