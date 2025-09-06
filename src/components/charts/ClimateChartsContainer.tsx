@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import TemperatureChart from './TemperatureChart';
-import PrecipitationChart from './PrecipitationChart';
+
 import AirQualityChart from './AirQualityChart';
 import { TrendingUp, BarChart3, PieChart, Activity } from 'lucide-react';
 
@@ -151,14 +151,10 @@ const ClimateChartsContainer: React.FC<ClimateChartsContainerProps> = ({ data })
 
       {/* Detailed Charts */}
       <Tabs defaultValue="temperature" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="temperature" className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
             Temperature
-          </TabsTrigger>
-          <TabsTrigger value="precipitation" className="flex items-center gap-2">
-            <BarChart3 className="w-4 h-4" />
-            Precipitation
           </TabsTrigger>
           <TabsTrigger value="air-quality" className="flex items-center gap-2">
             <PieChart className="w-4 h-4" />
@@ -176,16 +172,6 @@ const ClimateChartsContainer: React.FC<ClimateChartsContainerProps> = ({ data })
           />
         </TabsContent>
         
-        <TabsContent value="precipitation" className="mt-6">
-          <PrecipitationChart
-            data={precipitationData}
-            currentPrecip={data.precipitation.current}
-            unit="mm"
-            trend={data.precipitation.trend}
-            historicalAverage={data.rawData?.precipitation?.historical_average}
-            cumulative={data.rawData?.precipitation?.cumulative}
-          />
-        </TabsContent>
         
         <TabsContent value="air-quality" className="mt-6">
           <AirQualityChart
