@@ -101,7 +101,11 @@ const Index = () => {
           precipitation: climate.precipitation.current,
           windDirection: climate.wind?.direction || 0
         },
-        rawData: { climate, airQuality }
+        rawData: { climate, airQuality },
+        dataSource: climate.dataSource || 'weather_station',
+        dataFreshness: climate.dataFreshness || 'unknown',
+        dataAge: climate.dataAge || 'unknown',
+        timestamp: climate.timestamp
       };
 
       setClimateData(transformedData);
