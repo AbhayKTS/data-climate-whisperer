@@ -19,49 +19,90 @@ serve(async (req) => {
     // Current weather data from Open-Meteo
     const currentWeatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m&timezone=auto`;
     
-    // Historical data for anomaly detection
-    const historicalUrl = `https://api.open-meteo.com/v1/climate?latitude=${latitude}&longitude=${longitude}&start_date=${startDate || '2020-01-01'}&end_date=${endDate || '2023-12-31'}&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
+    // Historical climate data (last 30 years using archive API)
+    const historicalUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${latitude}&longitude=${longitude}&start_date=1993-01-01&end_date=2022-12-31&daily=temperature_2m_mean,precipitation_sum&timezone=auto`;
+
+    console.log('Fetching current weather from:', currentWeatherUrl);
+    console.log('Fetching historical data from:', historicalUrl);
 
     const [currentResponse, historicalResponse] = await Promise.all([
-      fetch(currentWeatherUrl),
-      fetch(historicalUrl)
+      fetch(currentWeatherUrl).catch(err => {
+        console.error('Current weather fetch failed:', err);
+        return { ok: false, status: 500, statusText: 'Network error' };
+      }),
+      fetch(historicalUrl).catch(err => {
+        console.error('Historical data fetch failed:', err);
+        return { ok: false, status: 500, statusText: 'Network error' };
+      })
     ]);
 
-    if (!currentResponse.ok || !historicalResponse.ok) {
-      throw new Error('Failed to fetch weather data');
+    if (!currentResponse.ok) {
+      console.error('Current weather API error:', currentResponse.status, currentResponse.statusText);
+      throw new Error(`Failed to fetch current weather data: ${currentResponse.status}`);
+    }
+
+    if (!historicalResponse.ok) {
+      console.warn('Historical data API error:', historicalResponse.status, historicalResponse.statusText);
+      // Continue without historical data
     }
 
     const currentData = await currentResponse.json();
-    const historicalData = await historicalResponse.json();
+    console.log('Current weather data received:', Object.keys(currentData));
 
-    // Calculate temperature anomaly
-    const currentTemp = currentData.current.temperature_2m;
-    const historicalTemps = historicalData.daily.temperature_2m_mean;
-    const avgHistoricalTemp = historicalTemps.reduce((sum: number, temp: number) => sum + temp, 0) / historicalTemps.length;
-    const tempAnomaly = currentTemp - avgHistoricalTemp;
+    let historicalData = null;
+    let tempAnomaly = 0;
+    let historicalPrecipAvg = 0;
+
+    // Process historical data if available
+    if (historicalResponse.ok) {
+      try {
+        historicalData = await historicalResponse.json();
+        console.log('Historical data received:', Object.keys(historicalData));
+        
+        if (historicalData.daily && historicalData.daily.temperature_2m_mean) {
+          const currentTemp = currentData.current.temperature_2m;
+          const historicalTemps = historicalData.daily.temperature_2m_mean.filter((temp: number) => temp !== null);
+          
+          if (historicalTemps.length > 0) {
+            const avgHistoricalTemp = historicalTemps.reduce((sum: number, temp: number) => sum + temp, 0) / historicalTemps.length;
+            tempAnomaly = currentTemp - avgHistoricalTemp;
+          }
+          
+          if (historicalData.daily.precipitation_sum) {
+            const historicalPrecip = historicalData.daily.precipitation_sum.filter((precip: number) => precip !== null);
+            if (historicalPrecip.length > 0) {
+              historicalPrecipAvg = historicalPrecip.reduce((sum: number, val: number) => sum + val, 0) / historicalPrecip.length;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error processing historical data:', error);
+      }
+    }
 
     const result = {
       location: { latitude, longitude },
       temperature: {
-        current: currentTemp,
-        unit: currentData.current_units.temperature_2m,
+        current: currentData.current.temperature_2m,
+        unit: currentData.current_units?.temperature_2m || '°C',
         anomaly: Number(tempAnomaly.toFixed(1)),
-        trend: tempAnomaly > 0 ? 'warming' : 'cooling'
+        trend: tempAnomaly > 0 ? 'warming' : tempAnomaly < 0 ? 'cooling' : 'stable'
       },
       precipitation: {
-        current: currentData.current.precipitation,
-        unit: currentData.current_units.precipitation,
-        historical_average: historicalData.daily.precipitation_sum.reduce((sum: number, val: number) => sum + val, 0) / historicalData.daily.precipitation_sum.length
+        current: currentData.current.precipitation || 0,
+        unit: currentData.current_units?.precipitation || 'mm',
+        historical_average: Number(historicalPrecipAvg.toFixed(2))
       },
       wind: {
-        speed: currentData.current.wind_speed_10m,
-        unit: currentData.current_units.wind_speed_10m
+        speed: currentData.current.wind_speed_10m || 0,
+        unit: currentData.current_units?.wind_speed_10m || 'km/h'
       },
       humidity: {
-        current: currentData.current.relative_humidity_2m,
-        unit: currentData.current_units.relative_humidity_2m
+        current: currentData.current.relative_humidity_2m || 0,
+        unit: currentData.current_units?.relative_humidity_2m || '%'
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      hasHistoricalData: historicalData !== null
     };
 
     return new Response(JSON.stringify(result), {

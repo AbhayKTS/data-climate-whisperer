@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import MapErrorBoundary from './MapErrorBoundary';
+import { WORKING_CLIMATE_LAYERS, FALLBACK_LAYERS } from './WorkingClimateLayers';
 
 // Fix for default markers in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -42,13 +43,18 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
   const [selectedLayers, setSelectedLayers] = useState({
     temperature: false,
     precipitation: false,
-    airQuality: false,
+    wind: false,
   });
   const [climateLayers, setClimateLayers] = useState<{
     temperature?: L.TileLayer;
     precipitation?: L.TileLayer;
-    airQuality?: L.TileLayer;
+    wind?: L.TileLayer;
   }>({});
+  const [layerLoadingState, setLayerLoadingState] = useState({
+    temperature: false,
+    precipitation: false,
+    wind: false,
+  });
   const [marker, setMarker] = useState<L.Marker | null>(null);
 
   // Initialize map
@@ -98,105 +104,117 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
     };
   }, []);
 
-  // Handle layer changes with better state management
+  // Create layer helper function
+  const createLayer = useCallback((layerType: 'temperature' | 'precipitation' | 'wind') => {
+    const config = WORKING_CLIMATE_LAYERS[layerType];
+    let layer: L.TileLayer;
+
+    try {
+      // First try the main service
+      layer = L.tileLayer(config.url, {
+        attribution: config.attribution,
+        opacity: config.opacity,
+        maxZoom: 18,
+        errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQIHWNgAAIAAAUAAY27m/MAAAAASUVORK5CYII=' // transparent pixel
+      });
+
+      // If fallback is available, create fallback layer
+      if (config.fallback && FALLBACK_LAYERS[layerType]) {
+        const fallbackConfig = FALLBACK_LAYERS[layerType].createLayer();
+        const fallbackLayer = L.tileLayer(fallbackConfig.url, {
+          attribution: fallbackConfig.attribution,
+          opacity: fallbackConfig.opacity,
+          maxZoom: 18
+        });
+
+        // Add error handling to switch to fallback
+        layer.on('tileerror', () => {
+          console.log(`Main ${layerType} layer failed, switching to fallback`);
+          if (map && map.hasLayer(layer)) {
+            map.removeLayer(layer);
+            fallbackLayer.addTo(map);
+          }
+        });
+      }
+
+      return layer;
+    } catch (error) {
+      console.error(`Error creating ${layerType} layer:`, error);
+      // Return fallback layer if available
+      if (FALLBACK_LAYERS[layerType]) {
+        const fallbackConfig = FALLBACK_LAYERS[layerType].createLayer();
+        return L.tileLayer(fallbackConfig.url, {
+          attribution: fallbackConfig.attribution,
+          opacity: fallbackConfig.opacity,
+          maxZoom: 18
+        });
+      }
+      return null;
+    }
+  }, [map]);
+
+  // Handle layer changes with improved reliability
   useEffect(() => {
     if (!map || !isMapLoaded) return;
 
-    const updateLayers = async () => {
-      try {
-        // Temperature layer
+    const updateLayers = () => {
+      // Handle temperature layer
+      if (selectedLayers.temperature !== !!climateLayers.temperature) {
         if (selectedLayers.temperature) {
-          if (!climateLayers.temperature) {
-            console.log('Adding temperature layer');
-            const tempLayer = L.tileLayer('https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=demo', {
-              attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-              opacity: 0.6,
-              maxZoom: 18
-            });
-            
-            map.whenReady(() => {
-              tempLayer.addTo(map);
-              console.log('Temperature layer added to map');
-            });
-            
+          setLayerLoadingState(prev => ({ ...prev, temperature: true }));
+          const tempLayer = createLayer('temperature');
+          if (tempLayer) {
+            tempLayer.addTo(map);
             setClimateLayers(prev => ({ ...prev, temperature: tempLayer }));
+            console.log('Temperature layer added');
           }
-        } else {
-          if (climateLayers.temperature) {
-            console.log('Removing temperature layer');
-            try {
-              map.removeLayer(climateLayers.temperature);
-              setClimateLayers(prev => ({ ...prev, temperature: undefined }));
-            } catch (e) {
-              console.log('Layer already removed');
-            }
-          }
+          setLayerLoadingState(prev => ({ ...prev, temperature: false }));
+        } else if (climateLayers.temperature) {
+          map.removeLayer(climateLayers.temperature);
+          setClimateLayers(prev => ({ ...prev, temperature: undefined }));
+          console.log('Temperature layer removed');
         }
+      }
 
-        // Precipitation layer
+      // Handle precipitation layer  
+      if (selectedLayers.precipitation !== !!climateLayers.precipitation) {
         if (selectedLayers.precipitation) {
-          if (!climateLayers.precipitation) {
-            console.log('Adding precipitation layer');
-            const precipLayer = L.tileLayer('https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=demo', {
-              attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-              opacity: 0.6,
-              maxZoom: 18
-            });
-            
-            map.whenReady(() => {
-              precipLayer.addTo(map);
-              console.log('Precipitation layer added to map');
-            });
-            
+          setLayerLoadingState(prev => ({ ...prev, precipitation: true }));
+          const precipLayer = createLayer('precipitation');
+          if (precipLayer) {
+            precipLayer.addTo(map);
             setClimateLayers(prev => ({ ...prev, precipitation: precipLayer }));
+            console.log('Precipitation layer added');
           }
-        } else {
-          if (climateLayers.precipitation) {
-            console.log('Removing precipitation layer');
-            try {
-              map.removeLayer(climateLayers.precipitation);
-              setClimateLayers(prev => ({ ...prev, precipitation: undefined }));
-            } catch (e) {
-              console.log('Layer already removed');
-            }
-          }
+          setLayerLoadingState(prev => ({ ...prev, precipitation: false }));
+        } else if (climateLayers.precipitation) {
+          map.removeLayer(climateLayers.precipitation);
+          setClimateLayers(prev => ({ ...prev, precipitation: undefined }));
+          console.log('Precipitation layer removed');
         }
+      }
 
-        // Wind patterns layer (using wind as air quality proxy)
-        if (selectedLayers.airQuality) {
-          if (!climateLayers.airQuality) {
-            console.log('Adding wind patterns layer');
-            const windLayer = L.tileLayer('https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=demo', {
-              attribution: '&copy; <a href="https://openweathermap.org/">OpenWeatherMap</a>',
-              opacity: 0.5,
-              maxZoom: 18
-            });
-            
-            map.whenReady(() => {
-              windLayer.addTo(map);
-              console.log('Wind patterns layer added to map');
-            });
-            
-            setClimateLayers(prev => ({ ...prev, airQuality: windLayer }));
+      // Handle wind layer
+      if (selectedLayers.wind !== !!climateLayers.wind) {
+        if (selectedLayers.wind) {
+          setLayerLoadingState(prev => ({ ...prev, wind: true }));
+          const windLayer = createLayer('wind');
+          if (windLayer) {
+            windLayer.addTo(map);
+            setClimateLayers(prev => ({ ...prev, wind: windLayer }));
+            console.log('Wind layer added');
           }
-        } else {
-          if (climateLayers.airQuality) {
-            console.log('Removing wind patterns layer');
-            try {
-              map.removeLayer(climateLayers.airQuality);
-              setClimateLayers(prev => ({ ...prev, airQuality: undefined }));
-            } catch (e) {
-              console.log('Layer already removed');
-            }
-          }
+          setLayerLoadingState(prev => ({ ...prev, wind: false }));
+        } else if (climateLayers.wind) {
+          map.removeLayer(climateLayers.wind);
+          setClimateLayers(prev => ({ ...prev, wind: undefined }));
+          console.log('Wind layer removed');
         }
-      } catch (error) {
-        console.error('Error handling layer changes:', error);
       }
     };
 
     updateLayers();
-  }, [map, selectedLayers, isMapLoaded]);
+  }, [map, selectedLayers, isMapLoaded, createLayer]);
 
   // Handle selected location marker
   useEffect(() => {
@@ -219,22 +237,20 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
           icon: createClimateIcon()
         });
 
-        // Use whenReady to ensure map is fully initialized
-        map.whenReady(() => {
-          try {
-            newMarker.addTo(map);
-            newMarker.bindPopup(`
-              <div style="font-size: 12px;">
-                <strong>Selected Location</strong><br />
-                Lat: ${selectedLocation.lat.toFixed(4)}<br />
-                Lng: ${selectedLocation.lng.toFixed(4)}
-              </div>
-            `);
-            setMarker(newMarker);
-          } catch (error) {
-            console.error('Error adding marker:', error);
-          }
-        });
+        // Add marker directly without whenReady to avoid timing issues
+        try {
+          newMarker.addTo(map);
+          newMarker.bindPopup(`
+            <div style="font-size: 12px;">
+              <strong>Selected Location</strong><br />
+              Lat: ${selectedLocation.lat.toFixed(4)}<br />
+              Lng: ${selectedLocation.lng.toFixed(4)}
+            </div>
+          `);
+          setMarker(newMarker);
+        } catch (error) {
+          console.error('Error adding marker:', error);
+        }
       }
     } catch (error) {
       console.error('Error handling marker:', error);
@@ -269,7 +285,12 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
                 checked={selectedLayers.temperature}
                 onChange={() => handleLayerChange('temperature')}
               />
-              <span>Temperature</span>
+              <span className="flex items-center gap-1">
+                Temperature
+                {layerLoadingState.temperature && (
+                  <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                )}
+              </span>
             </label>
             <label className="flex items-center space-x-2 text-xs cursor-pointer">
               <input 
@@ -278,16 +299,26 @@ const ClimateMap: React.FC<ClimateMapProps> = ({ onLocationSelect, selectedLocat
                 checked={selectedLayers.precipitation}
                 onChange={() => handleLayerChange('precipitation')}
               />
-              <span>Precipitation</span>
+              <span className="flex items-center gap-1">
+                Precipitation
+                {layerLoadingState.precipitation && (
+                  <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                )}
+              </span>
             </label>
             <label className="flex items-center space-x-2 text-xs cursor-pointer">
               <input 
                 type="checkbox" 
                 className="rounded border-border cursor-pointer"
-                checked={selectedLayers.airQuality}
-                onChange={() => handleLayerChange('airQuality')}
+                checked={selectedLayers.wind}
+                onChange={() => handleLayerChange('wind')}
               />
-              <span>Wind Patterns</span>
+              <span className="flex items-center gap-1">
+                Wind Patterns
+                {layerLoadingState.wind && (
+                  <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                )}
+              </span>
             </label>
           </div>
         </div>
