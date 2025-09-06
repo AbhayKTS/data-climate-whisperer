@@ -117,7 +117,7 @@ const DataPanel: React.FC<DataPanelProps> = ({ data, isLoading }) => {
                data.dataSource === 'forecast_model' ? '🔮 Forecast Model' : '📡 Satellite'}
             </Badge>
             <span className="text-muted-foreground">
-              {data.dataAge} • Updated: {data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : 'Unknown'}
+              • Updated: {data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : 'Unknown'}
             </span>
           </div>
         )}
